@@ -35,14 +35,14 @@
 
 using namespace Microsoft::WRL;
 
-enum class GradientMode : uint32_t {
-	None = 0,
-	TwoColour = 2,
-	ThreeColour = 3,
-	FourColour = 4
+enum class gradient_mode : uint32_t {
+	none = 0,
+	two_colour = 2,
+	three_colour = 3,
+	four_colour = 4
 };
 
-struct TextSource {
+struct obs_dwrite_text_source {
 
 	obs_source_t *source = nullptr;
 	gs_texture_t *tex = nullptr;
@@ -76,7 +76,7 @@ struct TextSource {
 	uint32_t color3 = 0xFFFFFF;
 	uint32_t color4 = 0xFFFFFF;
 
-	GradientMode gradient_count = GradientMode::None;
+	gradient_mode gradient_count = gradient_mode::none;
 
 	float gradient_dir = 0;
 	float gradient_x = 0;
@@ -116,7 +116,7 @@ struct TextSource {
 
 	/* --------------------------- */
 
-	inline TextSource(obs_source_t *source_, obs_data_t *settings)
+	inline obs_dwrite_text_source(obs_source_t *source_, obs_data_t *settings)
 		: source(source_)
 	{
 		obs_enter_graphics();
@@ -129,7 +129,7 @@ struct TextSource {
 		obs_source_update(source, settings);
 	}
 
-	inline ~TextSource()
+	inline ~obs_dwrite_text_source()
 	{
 		if (tex) {
 			obs_enter_graphics();

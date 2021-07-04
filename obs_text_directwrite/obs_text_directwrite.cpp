@@ -134,7 +134,7 @@ static time_t get_modified_timestamp(const char *filename)
 	return stats.st_mtime;
 }
 
-void TextSource::UpdateFont()
+void obs_dwrite_text_source::UpdateFont()
 {
 	if (bold)
 		weight = DWRITE_FONT_WEIGHT::DWRITE_FONT_WEIGHT_BOLD;
@@ -147,7 +147,7 @@ void TextSource::UpdateFont()
 		style = DWRITE_FONT_STYLE::DWRITE_FONT_STYLE_NORMAL;
 }
 
-void TextSource::CalculateGradientAxis(float width, float height)
+void obs_dwrite_text_source::CalculateGradientAxis(float width, float height)
 {
 	if (width <= 0.0 || height <= 0.0)
 		return;
@@ -185,7 +185,7 @@ void TextSource::CalculateGradientAxis(float width, float height)
 	}
 }
 
-HRESULT TextSource::InitializeDirectWrite()
+HRESULT obs_dwrite_text_source::InitializeDirectWrite()
 {
 	HRESULT hr = S_OK;
 	hr = D2D1CreateFactory(D2D1_FACTORY_TYPE_SINGLE_THREADED,
@@ -226,12 +226,12 @@ HRESULT TextSource::InitializeDirectWrite()
 	return hr;
 }
 
-void TextSource::ReleaseResource()
+void obs_dwrite_text_source::ReleaseResource()
 {
 	SafeRelease(&pTextRenderer);
 }
 
-void TextSource::UpdateBrush(ComPtr<ID2D1DeviceContext4> pD2DDeviceContext,
+void obs_dwrite_text_source::UpdateBrush(ComPtr<ID2D1DeviceContext4> pD2DDeviceContext,
 			     ID2D1Brush **ppOutlineBrush,
 			     ID2D1Brush **ppFillBrush, float width,
 			     float height)
@@ -284,7 +284,7 @@ void TextSource::UpdateBrush(ComPtr<ID2D1DeviceContext4> pD2DDeviceContext,
 	}
 }
 
-void TextSource::RenderText()
+void obs_dwrite_text_source::RenderText()
 {
 	UINT32 TextLength = (UINT32)wcslen(text.c_str());
 	HRESULT hr = S_OK;
@@ -417,7 +417,7 @@ cleanup:
 	SafeRelease(&pTextRenderer);
 }
 
-const char *TextSource::GetMainString(const char *str)
+const char *obs_dwrite_text_source::GetMainString(const char *str)
 {
 	if (!str)
 		return "";
@@ -443,7 +443,7 @@ const char *TextSource::GetMainString(const char *str)
 	return *temp == '\n' ? temp + 1 : temp;
 }
 
-void TextSource::LoadFileText()
+void obs_dwrite_text_source::LoadFileText()
 {
 	BPtr<char> file_text = os_quick_read_utf8_file(file.c_str());
 	text = to_wide(GetMainString(file_text));
@@ -451,7 +451,7 @@ void TextSource::LoadFileText()
 
 #define obs_data_get_uint32 (uint32_t) obs_data_get_int
 
-inline void TextSource::Update(obs_data_t *s)
+inline void obs_dwrite_text_source::Update(obs_data_t *s)
 {
 	const char *new_text = obs_data_get_string(s, S_TEXT);
 	obs_data_t *font_obj = obs_data_get_obj(s, S_FONT);
@@ -526,16 +526,16 @@ inline void TextSource::Update(obs_data_t *s)
 	gradient_dir = new_grad_dir;
 	//vertical = new_vertical;
 
-	GradientMode new_count = GradientMode::None;
+	gradient_mode new_count = gradient_mode::none;
 
 	if (strcmp(gradient_str, S_GRADIENT_NONE) == 0)
-		new_count = GradientMode::None;
+		new_count = gradient_mode::none;
 	else if (strcmp(gradient_str, S_GRADIENT_TWO) == 0)
-		new_count = GradientMode::TwoColour;
+		new_count = gradient_mode::two_colour;
 	else if (strcmp(gradient_str, S_GRADIENT_THREE) == 0)
-		new_count = GradientMode::ThreeColour;
+		new_count = gradient_mode::three_colour;
 	else
-		new_count = GradientMode::FourColour;
+		new_count = gradient_mode::four_colour;
 
 	gradient_count = new_count;
 
@@ -595,7 +595,7 @@ inline void TextSource::Update(obs_data_t *s)
 	obs_data_release(font_obj);
 }
 
-inline void TextSource::Tick(float seconds)
+inline void obs_dwrite_text_source::Tick(float seconds)
 {
 	if (!read_from_file)
 		return;
@@ -614,7 +614,7 @@ inline void TextSource::Tick(float seconds)
 	}
 }
 
-inline void TextSource::Render(gs_effect_t *effect)
+inline void obs_dwrite_text_source::Render(gs_effect_t *effect)
 {
 	if (!tex)
 		return;
@@ -669,20 +669,20 @@ static bool gradient_changed(obs_properties_t *props, obs_property_t *p,
 			     obs_data_t *s)
 {
 	const char *gradient_str = obs_data_get_string(s, S_GRADIENT);
-	GradientMode mode = GradientMode::None;
+	gradient_mode mode = gradient_mode::none;
 
 	if (strcmp(gradient_str, S_GRADIENT_NONE) == 0)
-		mode = GradientMode::None;
+		mode = gradient_mode::none;
 	else if (strcmp(gradient_str, S_GRADIENT_TWO) == 0)
-		mode = GradientMode::TwoColour;
+		mode = gradient_mode::two_colour;
 	else if (strcmp(gradient_str, S_GRADIENT_THREE) == 0)
-		mode = GradientMode::ThreeColour;
+		mode = gradient_mode::three_colour;
 	else
-		mode = GradientMode::FourColour;
+		mode = gradient_mode::four_colour;
 
-	bool gradient_color = (mode > GradientMode::None);
-	bool gradient_color2 = (mode > GradientMode::TwoColour);
-	bool gradient_color3 = (mode > GradientMode::ThreeColour);
+	bool gradient_color = (mode > gradient_mode::none);
+	bool gradient_color2 = (mode > gradient_mode::two_colour);
+	bool gradient_color3 = (mode > gradient_mode::three_colour);
 
 	set_vis(gradient_color, S_GRADIENT_COLOR, true);
 	set_vis(gradient_color2, S_GRADIENT_COLOR2, true);
@@ -707,7 +707,7 @@ static bool extents_modified(obs_properties_t *props, obs_property_t *p,
 
 static obs_properties_t *get_properties(void *data)
 {
-	TextSource *s = reinterpret_cast<TextSource *>(data);
+	obs_dwrite_text_source *s = reinterpret_cast<obs_dwrite_text_source *>(data);
 	std::string path;
 
 	obs_properties_t *props = obs_properties_create();
@@ -826,16 +826,16 @@ bool obs_module_load(void)
 
 	si.get_name = [](void *) { return obs_module_text("TextDirectWrite"); };
 	si.create = [](obs_data_t *settings, obs_source_t *source) {
-		return (void *)new TextSource(source, settings);
+		return (void *)new obs_dwrite_text_source(source, settings);
 	};
 	si.destroy = [](void *data) {
-		delete reinterpret_cast<TextSource *>(data);
+		delete reinterpret_cast<obs_dwrite_text_source *>(data);
 	};
 	si.get_width = [](void *data) {
-		return reinterpret_cast<TextSource *>(data)->cx;
+		return reinterpret_cast<obs_dwrite_text_source *>(data)->cx;
 	};
 	si.get_height = [](void *data) {
-		return reinterpret_cast<TextSource *>(data)->cy;
+		return reinterpret_cast<obs_dwrite_text_source *>(data)->cy;
 	};
 	si.get_defaults = [](obs_data_t *settings) {
 		obs_data_t *font_obj = obs_data_create();
@@ -866,13 +866,13 @@ bool obs_module_load(void)
 		obs_data_release(font_obj);
 	};
 	si.update = [](void *data, obs_data_t *settings) {
-		reinterpret_cast<TextSource *>(data)->Update(settings);
+		reinterpret_cast<obs_dwrite_text_source *>(data)->Update(settings);
 	};
 	si.video_tick = [](void *data, float seconds) {
-		reinterpret_cast<TextSource *>(data)->Tick(seconds);
+		reinterpret_cast<obs_dwrite_text_source *>(data)->Tick(seconds);
 	};
 	si.video_render = [](void *data, gs_effect_t *effect) {
-		reinterpret_cast<TextSource *>(data)->Render(effect);
+		reinterpret_cast<obs_dwrite_text_source *>(data)->Render(effect);
 	};
 
 	obs_register_source(&si);

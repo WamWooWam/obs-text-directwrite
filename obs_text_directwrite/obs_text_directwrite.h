@@ -61,7 +61,7 @@ struct obs_dwrite_text_source {
 	ComPtr<ID2D1Brush> pOutlineBrush = nullptr;
 	ComPtr<ID2D1Bitmap1> pTarget = nullptr;
 
-	obs_text_renderer *pTextRenderer = nullptr;
+	ComPtr<obs_text_renderer> pTextRenderer = nullptr;
 
 	bool read_from_file = false;
 	std::string file;
@@ -100,6 +100,8 @@ struct obs_dwrite_text_source {
 	bool italic = false;
 	bool underline = false;
 	bool strikeout = false;
+	bool color_fonts = true;
+	bool antialias = true;
 	//bool vertical = false;
 
 	bool use_outline = false;
@@ -116,7 +118,8 @@ struct obs_dwrite_text_source {
 
 	/* --------------------------- */
 
-	inline obs_dwrite_text_source(obs_source_t *source_, obs_data_t *settings)
+	inline obs_dwrite_text_source(obs_source_t *source_,
+				      obs_data_t *settings)
 		: source(source_)
 	{
 		obs_enter_graphics();

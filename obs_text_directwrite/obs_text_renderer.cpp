@@ -9,36 +9,21 @@ obs_text_renderer::obs_text_renderer(IDWriteFactory4 *pDWriteFactory_,
 				     ID2D1DeviceContext4 *pDeviceContext_,
 				     ID2D1Brush *pOutlineBrush_,
 				     ID2D1Brush *pFillBrush_,
-				     float outlineSize_)
+				     float outlineSize_, bool colorFonts_)
 	: cRefCount_(0),
 	  pD2DFactory(pD2DFactory_),
 	  pDWriteFactory(pDWriteFactory_),
 	  pDeviceContext(pDeviceContext_),
 	  pFillBrush(pFillBrush_),
-	  outlineSize(outlineSize_)
+	  pOutlineBrush(pOutlineBrush_),
+	  outlineSize(outlineSize_),
+	  colorFonts(colorFonts_)
 {
-	pD2DFactory->AddRef();
-	pDWriteFactory->AddRef();
-	pDeviceContext->AddRef();
-	pFillBrush->AddRef();
-
-	if (pOutlineBrush_) {
-		pOutlineBrush = pOutlineBrush_;
-		pOutlineBrush->AddRef();
-	}
-
 	pDeviceContext_->CreateSolidColorBrush(
-		D2D1::ColorF(D2D1::ColorF::Black), &pTempBrush);
+		D2D1::ColorF(D2D1::ColorF::Black), pTempBrush.GetAddressOf());
 }
 
-obs_text_renderer::~obs_text_renderer()
-{
-	SafeRelease(&pD2DFactory);
-	SafeRelease(&pDeviceContext);
-	SafeRelease(&pDWriteFactory);
-	SafeRelease(&pFillBrush);
-	SafeRelease(&pTempBrush);
-}
+obs_text_renderer::~obs_text_renderer() {}
 
 IFACEMETHODIMP obs_text_renderer::DrawGlyphRun(
 	__maybenull void *clientDrawingContext, FLOAT baselineOriginX,
@@ -77,7 +62,7 @@ IFACEMETHODIMP obs_text_renderer::DrawGlyphRun(
 				pTransformedGeometry.GetAddressOf());
 
 			pDeviceContext->DrawGeometry(pTransformedGeometry.Get(),
-						     pOutlineBrush,
+						     pOutlineBrush.Get(),
 						     outlineSize);
 		}
 
@@ -100,12 +85,13 @@ IFACEMETHODIMP obs_text_renderer::DrawGlyphRun(
 			supportedFormats, measuringMode, nullptr, 0,
 			&glyphRunEnumerator);
 
-		if (hr == DWRITE_E_NOCOLOR) {
+		if (hr == DWRITE_E_NOCOLOR || !colorFonts) {
 			// Simple case: the run has no color glyphs. Draw the main glyph run
 			// using the current text color.
 			pDeviceContext->DrawGlyphRun(baselineOrigin, glyphRun,
 						     glyphRunDescription,
-						     pFillBrush, measuringMode);
+						     pFillBrush.Get(),
+						     measuringMode);
 		} else {
 			//DX::ThrowIfFailed(hr);
 
@@ -142,7 +128,8 @@ IFACEMETHODIMP obs_text_renderer::DrawGlyphRun(
 					// This run is SVG glyphs. Use Direct2D to draw them.
 					pDeviceContext->DrawSvgGlyphRun(
 						currentBaselineOrigin,
-						&colorRun->glyphRun, pFillBrush,
+						&colorRun->glyphRun,
+						pFillBrush.Get(),
 						nullptr, // svgGlyphStyle
 						0,       // colorPaletteIndex
 						measuringMode);
@@ -194,27 +181,27 @@ obs_text_renderer::DrawUnderline(__maybenull void *clientDrawingContext,
 		D2D1::RectF(0, underline->offset, underline->width,
 			    underline->offset + underline->thickness);
 
-	ID2D1RectangleGeometry *pRectangleGeometry = NULL;
+	ComPtr<ID2D1RectangleGeometry> pRectangleGeometry;
+	ComPtr<ID2D1TransformedGeometry> pTransformedGeometry;
 
-	hr = pD2DFactory->CreateRectangleGeometry(&rect, &pRectangleGeometry);
+	hr = pD2DFactory->CreateRectangleGeometry(
+		&rect, pRectangleGeometry.GetAddressOf());
 
 	D2D1::Matrix3x2F const matrix = D2D1::Matrix3x2F(
 		1.0f, 0.0f, 0.0f, 1.0f, baselineOriginX, baselineOriginY);
 
-	ID2D1TransformedGeometry *pTransformedGeometry = NULL;
 	if (SUCCEEDED(hr)) {
 		hr = pD2DFactory->CreateTransformedGeometry(
-			pRectangleGeometry, &matrix, &pTransformedGeometry);
+			pRectangleGeometry.Get(), &matrix,
+			pTransformedGeometry.GetAddressOf());
 	}
 
 	if (pOutlineBrush)
-		pDeviceContext->DrawGeometry(pTransformedGeometry,
-					     pOutlineBrush, outlineSize);
+		pDeviceContext->DrawGeometry(pTransformedGeometry.Get(),
+					     pOutlineBrush.Get(), outlineSize);
 
-	pDeviceContext->FillGeometry(pTransformedGeometry, pFillBrush);
-
-	SafeRelease(&pRectangleGeometry);
-	SafeRelease(&pTransformedGeometry);
+	pDeviceContext->FillGeometry(pTransformedGeometry.Get(),
+				     pFillBrush.Get());
 
 	return S_OK;
 }
@@ -230,26 +217,27 @@ IFACEMETHODIMP obs_text_renderer::DrawStrikethrough(
 		D2D1::RectF(0, strikethrough->offset, strikethrough->width,
 			    strikethrough->offset + strikethrough->thickness);
 
-	ID2D1RectangleGeometry *pRectangleGeometry = NULL;
-	hr = pD2DFactory->CreateRectangleGeometry(&rect, &pRectangleGeometry);
+	ComPtr<ID2D1RectangleGeometry> pRectangleGeometry;
+	ComPtr<ID2D1TransformedGeometry> pTransformedGeometry;
+
+	hr = pD2DFactory->CreateRectangleGeometry(
+		&rect, pRectangleGeometry.GetAddressOf());
 
 	D2D1::Matrix3x2F const matrix = D2D1::Matrix3x2F(
 		1.0f, 0.0f, 0.0f, 1.0f, baselineOriginX, baselineOriginY);
 
-	ID2D1TransformedGeometry *pTransformedGeometry = NULL;
 	if (SUCCEEDED(hr)) {
 		hr = pD2DFactory->CreateTransformedGeometry(
-			pRectangleGeometry, &matrix, &pTransformedGeometry);
+			pRectangleGeometry.Get(), &matrix,
+			pTransformedGeometry.GetAddressOf());
 	}
 
 	if (pOutlineBrush)
-		pDeviceContext->DrawGeometry(pTransformedGeometry,
-					     pOutlineBrush, outlineSize);
+		pDeviceContext->DrawGeometry(pTransformedGeometry.Get(),
+					     pOutlineBrush.Get(), outlineSize);
 
-	pDeviceContext->FillGeometry(pTransformedGeometry, pFillBrush);
-
-	SafeRelease(&pRectangleGeometry);
-	SafeRelease(&pTransformedGeometry);
+	pDeviceContext->FillGeometry(pTransformedGeometry.Get(),
+				     pFillBrush.Get());
 
 	return S_OK;
 }

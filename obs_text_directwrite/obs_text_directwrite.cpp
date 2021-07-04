@@ -48,6 +48,10 @@
 #define S_WRAP_MODE_WRAP_WHOLE_WORDS "wrap_whole_words"
 #define S_WRAP_MODE_WRAP_CHARACTER "wrap_character"
 
+#define S_COLOR_FONTS "color_fonts"
+
+#define S_ANTIALIAS "antialias"
+
 #define T_(v) obs_module_text(v)
 #define T_FONT T_("Font")
 #define T_USE_FILE T_("ReadFromFile")
@@ -96,6 +100,9 @@
 #define T_WRAP_MODE_WRAP T_("WordWrap.Wrap")
 #define T_WRAP_MODE_WRAP_WHOLE_WORDS T_("WordWrap.WrapWholeWords")
 #define T_WRAP_MODE_WRAP_CHARACTER T_("WordWrap.WrapCharacter")
+
+#define T_COLOR_FONTS T_("ColorFonts")
+#define T_ANTIALIAS T_("Antialias")
 
 /* ------------------------------------------------------------------------- */
 
@@ -226,15 +233,12 @@ HRESULT obs_dwrite_text_source::InitializeDirectWrite()
 	return hr;
 }
 
-void obs_dwrite_text_source::ReleaseResource()
-{
-	SafeRelease(&pTextRenderer);
-}
+void obs_dwrite_text_source::ReleaseResource() {}
 
-void obs_dwrite_text_source::UpdateBrush(ComPtr<ID2D1DeviceContext4> pD2DDeviceContext,
-			     ID2D1Brush **ppOutlineBrush,
-			     ID2D1Brush **ppFillBrush, float width,
-			     float height)
+void obs_dwrite_text_source::UpdateBrush(
+	ComPtr<ID2D1DeviceContext4> pD2DDeviceContext,
+	ID2D1Brush **ppOutlineBrush, ID2D1Brush **ppFillBrush, float width,
+	float height)
 {
 	HRESULT hr;
 
@@ -246,13 +250,13 @@ void obs_dwrite_text_source::UpdateBrush(ComPtr<ID2D1DeviceContext4> pD2DDeviceC
 		float level = 1.0 / ((uint32_t)gradient_count - 1);
 
 		D2D1_GRADIENT_STOP gradientStops[4];
-		gradientStops[0].color = D2D1::ColorF(color, opacity / 100.0);
+		gradientStops[0].color = D2D1::ColorF(color, opacity / 100.0f);
 		gradientStops[0].position = 0.0f;
-		gradientStops[1].color = D2D1::ColorF(color2, opacity2 / 100.0);
+		gradientStops[1].color = D2D1::ColorF(color2, opacity2 / 100.0f);
 		gradientStops[1].position = gradientStops[0].position + level;
-		gradientStops[2].color = D2D1::ColorF(color3, opacity2 / 100.0);
+		gradientStops[2].color = D2D1::ColorF(color3, opacity2 / 100.0f);
 		gradientStops[2].position = gradientStops[1].position + level;
-		gradientStops[3].color = D2D1::ColorF(color4, opacity2 / 100.0);
+		gradientStops[3].color = D2D1::ColorF(color4, opacity2 / 100.0f);
 		gradientStops[3].position = 1.0f;
 
 		hr = pD2DDeviceContext->CreateGradientStopCollection(
@@ -268,13 +272,13 @@ void obs_dwrite_text_source::UpdateBrush(ComPtr<ID2D1DeviceContext4> pD2DDeviceC
 
 	} else {
 		hr = pD2DDeviceContext->CreateSolidColorBrush(
-			D2D1::ColorF(color, opacity / 100.0),
+			D2D1::ColorF(color, opacity / 100.0f),
 			(ID2D1SolidColorBrush **)ppFillBrush);
 	}
 
 	if (use_outline) {
 		hr = pD2DDeviceContext->CreateSolidColorBrush(
-			D2D1::ColorF(outline_color, outline_opacity / 100.0),
+			D2D1::ColorF(outline_color, outline_opacity / 100.0f),
 			(ID2D1SolidColorBrush **)ppOutlineBrush);
 	} else {
 		if (*ppOutlineBrush) {
@@ -286,6 +290,9 @@ void obs_dwrite_text_source::UpdateBrush(ComPtr<ID2D1DeviceContext4> pD2DDeviceC
 
 void obs_dwrite_text_source::RenderText()
 {
+	if (pTextRenderer)
+		pTextRenderer.Reset();
+
 	UINT32 TextLength = (UINT32)wcslen(text.c_str());
 	HRESULT hr = S_OK;
 
@@ -363,7 +370,7 @@ void obs_dwrite_text_source::RenderText()
 		hr = native_tex->QueryInterface(&native_surface);
 
 		if (FAILED(hr) || native_surface == nullptr)
-			goto cleanup;
+			return;
 
 		D2D1_BITMAP_PROPERTIES1 bitmapProperties =
 			D2D1::BitmapProperties1(
@@ -376,8 +383,9 @@ void obs_dwrite_text_source::RenderText()
 		hr = pD2DDeviceContext->CreateBitmapFromDxgiSurface(
 			native_surface, &bitmapProperties,
 			pTarget.ReleaseAndGetAddressOf());
+
 		if (FAILED(hr) || pTarget == nullptr)
-			goto cleanup;
+			return;
 
 		pD2DDeviceContext->SetTarget(pTarget.Get());
 
@@ -403,18 +411,19 @@ void obs_dwrite_text_source::RenderText()
 		pTextRenderer = new (std::nothrow) obs_text_renderer(
 			pDWriteFactory.Get(), pD2DFactory.Get(),
 			pD2DDeviceContext.Get(), pOutlineBrush.Get(),
-			pFillBrush.Get(), outline_size);
+			pFillBrush.Get(), outline_size, color_fonts);
 
 		pD2DDeviceContext->BeginDraw();
-		pD2DDeviceContext->SetTransform(D2D1::IdentityMatrix());
+		pD2DDeviceContext->SetTextAntialiasMode(
+			antialias ? D2D1_TEXT_ANTIALIAS_MODE_GRAYSCALE
+				  : D2D1_TEXT_ANTIALIAS_MODE_ALIASED);
+				pD2DDeviceContext->SetTransform(
+					D2D1::IdentityMatrix());
 		pD2DDeviceContext->Clear(
-			D2D1::ColorF(bk_color, bk_opacity / 100.0));
-		pTextLayout->Draw(NULL, pTextRenderer, 0, 0);
+			D2D1::ColorF(bk_color, bk_opacity / 100.0f));
+		pTextLayout->Draw(NULL, pTextRenderer.Get(), 0, 0);
 		hr = pD2DDeviceContext->EndDraw();
 	}
-
-cleanup:
-	SafeRelease(&pTextRenderer);
 }
 
 const char *obs_dwrite_text_source::GetMainString(const char *str)
@@ -487,6 +496,9 @@ inline void obs_dwrite_text_source::Update(obs_data_t *s)
 	bool new_underline = (font_flags & OBS_FONT_UNDERLINE) != 0;
 	bool new_strikeout = (font_flags & OBS_FONT_STRIKEOUT) != 0;
 
+	bool new_color_fonts = obs_data_get_bool(s, S_COLOR_FONTS);
+	bool new_antialias = obs_data_get_bool(s, S_ANTIALIAS);
+
 	uint32_t new_bk_color = obs_data_get_uint32(s, S_BKCOLOR);
 	uint32_t new_bk_opacity = obs_data_get_uint32(s, S_BKOPACITY);
 
@@ -525,6 +537,8 @@ inline void obs_dwrite_text_source::Update(obs_data_t *s)
 	opacity2 = new_opacity2;
 	gradient_dir = new_grad_dir;
 	//vertical = new_vertical;
+	color_fonts = new_color_fonts;
+	antialias = new_antialias;
 
 	gradient_mode new_count = gradient_mode::none;
 
@@ -707,7 +721,8 @@ static bool extents_modified(obs_properties_t *props, obs_property_t *p,
 
 static obs_properties_t *get_properties(void *data)
 {
-	obs_dwrite_text_source *s = reinterpret_cast<obs_dwrite_text_source *>(data);
+	obs_dwrite_text_source *s =
+		reinterpret_cast<obs_dwrite_text_source *>(data);
 	std::string path;
 
 	obs_properties_t *props = obs_properties_create();
@@ -792,6 +807,8 @@ static obs_properties_t *get_properties(void *data)
 	obs_property_list_add_string(p, T_WRAP_MODE_WRAP_WHOLE_WORDS,
 				     S_WRAP_MODE_WRAP_WHOLE_WORDS);
 
+	p = obs_properties_add_bool(props, S_ANTIALIAS, T_ANTIALIAS);
+
 	p = obs_properties_add_bool(props, S_OUTLINE, T_OUTLINE);
 	obs_property_set_modified_callback(p, outline_changed);
 
@@ -805,6 +822,8 @@ static obs_properties_t *get_properties(void *data)
 
 	obs_properties_add_int(props, S_CHATLOG_LINES, T_CHATLOG_LINES, 1, 1000,
 			       1);
+
+	p = obs_properties_add_bool(props, S_COLOR_FONTS, T_COLOR_FONTS);
 
 	p = obs_properties_add_bool(props, S_EXTENTS, T_EXTENTS);
 	obs_property_set_modified_callback(p, extents_modified);
@@ -862,17 +881,21 @@ bool obs_module_load(void)
 		obs_data_set_default_int(settings, S_CHATLOG_LINES, 6);
 		obs_data_set_default_int(settings, S_EXTENTS_CX, 100);
 		obs_data_set_default_int(settings, S_EXTENTS_CY, 100);
+		obs_data_set_default_bool(settings, S_COLOR_FONTS, true);
+		obs_data_set_default_bool(settings, S_ANTIALIAS, true);
 
 		obs_data_release(font_obj);
 	};
 	si.update = [](void *data, obs_data_t *settings) {
-		reinterpret_cast<obs_dwrite_text_source *>(data)->Update(settings);
+		reinterpret_cast<obs_dwrite_text_source *>(data)->Update(
+			settings);
 	};
 	si.video_tick = [](void *data, float seconds) {
 		reinterpret_cast<obs_dwrite_text_source *>(data)->Tick(seconds);
 	};
 	si.video_render = [](void *data, gs_effect_t *effect) {
-		reinterpret_cast<obs_dwrite_text_source *>(data)->Render(effect);
+		reinterpret_cast<obs_dwrite_text_source *>(data)->Render(
+			effect);
 	};
 
 	obs_register_source(&si);

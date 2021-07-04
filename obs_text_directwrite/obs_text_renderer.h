@@ -5,20 +5,14 @@
 #include <dwrite_3.h>
 #include <wrl.h>
 
-template<class T> void SafeRelease(T **ppT)
-{
-	if (*ppT) {
-		(*ppT)->Release();
-		*ppT = NULL;
-	}
-}
+using namespace Microsoft::WRL;
 
 class obs_text_renderer : public IDWriteTextRenderer {
 public:
 	obs_text_renderer(IDWriteFactory4 *pDWriteFactory_,
 			  ID2D1Factory *pD2DFactory, ID2D1DeviceContext4 *pRT,
 			  ID2D1Brush *pOutlineBrush, ID2D1Brush *pFillBrush,
-			  float Outline_size_);
+			  float outlineSize, bool colorFonts);
 
 	~obs_text_renderer();
 
@@ -62,10 +56,11 @@ public:
 private:
 	unsigned long cRefCount_;
 	float outlineSize;
-	IDWriteFactory4 *pDWriteFactory;
-	ID2D1Factory *pD2DFactory;
-	ID2D1DeviceContext4 *pDeviceContext;
-	ID2D1Brush *pOutlineBrush = nullptr;
-	ID2D1Brush *pFillBrush;
-	ID2D1SolidColorBrush *pTempBrush;
+	bool colorFonts;
+	ComPtr<IDWriteFactory4> pDWriteFactory;
+	ComPtr<ID2D1Factory> pD2DFactory;
+	ComPtr<ID2D1DeviceContext4> pDeviceContext;
+	ComPtr<ID2D1Brush> pOutlineBrush = nullptr;
+	ComPtr<ID2D1Brush> pFillBrush;
+	ComPtr<ID2D1SolidColorBrush> pTempBrush;
 };

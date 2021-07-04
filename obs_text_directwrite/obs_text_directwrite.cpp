@@ -323,8 +323,10 @@ void obs_dwrite_text_source::RenderText()
 	UINT32 TextLength = (UINT32)wcslen(text.c_str());
 	HRESULT hr = S_OK;
 
-	float layout_cx = (use_extents) ? extents_cx : INFINITY;
-	float layout_cy = (use_extents) ? extents_cy : INFINITY;
+	float layout_cx = (use_extents && extents_cx != -1) ? extents_cx
+							    : INFINITY;
+	float layout_cy = (use_extents && extents_cy != -1) ? extents_cy
+							    : INFINITY;
 	float text_cx = 0.0;
 	float text_cy = 0.0;
 
@@ -371,8 +373,11 @@ void obs_dwrite_text_source::RenderText()
 		if (isnan(text_cy))
 			text_cy = MAX_SIZE_CY;
 
-		if (!use_extents) {
+		if (!use_extents || extents_cx == -1) {
 			layout_cx = text_cx;
+		}
+
+		if (!use_extents || extents_cy == -1) {
 			layout_cy = text_cy;
 		}
 
@@ -391,10 +396,9 @@ void obs_dwrite_text_source::RenderText()
 		tex = gs_texture_create(size.cx, size.cy, GS_BGRA_UNORM, 1,
 					nullptr, GS_RENDER_TARGET);
 
-		ID3D11Texture2D *native_tex =
-			(ID3D11Texture2D *)gs_texture_get_obj(tex);
-		IDXGISurface *native_surface = nullptr;
-		hr = native_tex->QueryInterface(&native_surface);
+		ComPtr<ID3D11Texture2D> native_tex(gs_texture_get_obj(tex));
+		ComPtr<IDXGISurface> native_surface;
+		native_tex.As(&native_surface);
 
 		if (FAILED(hr) || native_surface == nullptr)
 			return;
@@ -408,7 +412,7 @@ void obs_dwrite_text_source::RenderText()
 				96, 96);
 
 		hr = pD2DDeviceContext->CreateBitmapFromDxgiSurface(
-			native_surface, &bitmapProperties,
+			native_surface.Get(), &bitmapProperties,
 			pTarget.ReleaseAndGetAddressOf());
 
 		if (FAILED(hr) || pTarget == nullptr)
@@ -560,8 +564,8 @@ inline void obs_dwrite_text_source::Update(obs_data_t *s)
 	bool new_chat_mode = obs_data_get_bool(s, S_CHATLOG_MODE);
 	int new_chat_lines = (int)obs_data_get_int(s, S_CHATLOG_LINES);
 	bool new_extents = obs_data_get_bool(s, S_EXTENTS);
-	uint32_t n_extents_cx = obs_data_get_uint32(s, S_EXTENTS_CX);
-	uint32_t n_extents_cy = obs_data_get_uint32(s, S_EXTENTS_CY);
+	int32_t n_extents_cx = obs_data_get_int(s, S_EXTENTS_CX);
+	int32_t n_extents_cy = obs_data_get_int(s, S_EXTENTS_CY);
 
 	const char *font_face = obs_data_get_string(font_obj, "face");
 	int font_size = (int)obs_data_get_int(font_obj, "size");
@@ -844,24 +848,6 @@ static obs_properties_t *get_properties(void *data)
 	obs_properties_add_path(props, S_FILE, T_FILE, OBS_PATH_FILE,
 				filter.c_str(), path.c_str());
 
-	p = obs_properties_add_list(props, S_TRANSFORM, T_TRANSFORM,
-				    OBS_COMBO_TYPE_LIST, OBS_COMBO_FORMAT_INT);
-	obs_property_list_add_int(p, T_TRANSFORM_NONE, S_TRANSFORM_NONE);
-	obs_property_list_add_int(p, T_TRANSFORM_UPPERCASE,
-				  S_TRANSFORM_UPPERCASE);
-	obs_property_list_add_int(p, T_TRANSFORM_LOWERCASE,
-				  S_TRANSFORM_LOWERCASE);
-	obs_property_list_add_int(p, T_TRANSFORM_STARTCASE,
-				  S_TRANSFORM_STARTCASE);
-
-	p = obs_properties_add_list(props, S_TRIMMING, T_TRIMMING,
-				    OBS_COMBO_TYPE_LIST, OBS_COMBO_FORMAT_INT);
-	obs_property_list_add_int(p, T_TRIMMING_NONE, S_TRIMMING_NONE);
-	obs_property_list_add_int(p, T_TRIMMING_CHARACTER_ELLIPSIS,
-				  S_TRIMMING_CHARACTER_ELLIPSIS);
-	obs_property_list_add_int(p, T_TRIMMING_WORD_ELLIPSIS,
-				  S_TRIMMING_WORD_ELLIPSIS);
-
 	//obs_properties_add_bool(props, S_VERTICAL, T_VERTICAL);
 	obs_properties_add_color(props, S_COLOR, T_COLOR);
 	obs_properties_add_int_slider(props, S_OPACITY, T_OPACITY, 0, 100, 1);
@@ -907,6 +893,16 @@ static obs_properties_t *get_properties(void *data)
 	obs_property_list_add_string(p, T_VALIGN_CENTER, S_VALIGN_CENTER);
 	obs_property_list_add_string(p, T_VALIGN_BOTTOM, S_VALIGN_BOTTOM);
 
+	p = obs_properties_add_list(props, S_TRANSFORM, T_TRANSFORM,
+				    OBS_COMBO_TYPE_LIST, OBS_COMBO_FORMAT_INT);
+	obs_property_list_add_int(p, T_TRANSFORM_NONE, S_TRANSFORM_NONE);
+	obs_property_list_add_int(p, T_TRANSFORM_UPPERCASE,
+				  S_TRANSFORM_UPPERCASE);
+	obs_property_list_add_int(p, T_TRANSFORM_LOWERCASE,
+				  S_TRANSFORM_LOWERCASE);
+	obs_property_list_add_int(p, T_TRANSFORM_STARTCASE,
+				  S_TRANSFORM_STARTCASE);
+
 	p = obs_properties_add_list(props, S_WRAP_MODE, T_WRAP_MODE,
 				    OBS_COMBO_TYPE_LIST,
 				    OBS_COMBO_FORMAT_STRING);
@@ -916,6 +912,14 @@ static obs_properties_t *get_properties(void *data)
 				     S_WRAP_MODE_WRAP_CHARACTER);
 	obs_property_list_add_string(p, T_WRAP_MODE_WRAP_WHOLE_WORDS,
 				     S_WRAP_MODE_WRAP_WHOLE_WORDS);
+
+	p = obs_properties_add_list(props, S_TRIMMING, T_TRIMMING,
+				    OBS_COMBO_TYPE_LIST, OBS_COMBO_FORMAT_INT);
+	obs_property_list_add_int(p, T_TRIMMING_NONE, S_TRIMMING_NONE);
+	obs_property_list_add_int(p, T_TRIMMING_CHARACTER_ELLIPSIS,
+				  S_TRIMMING_CHARACTER_ELLIPSIS);
+	obs_property_list_add_int(p, T_TRIMMING_WORD_ELLIPSIS,
+				  S_TRIMMING_WORD_ELLIPSIS);
 
 	p = obs_properties_add_bool(props, S_OUTLINE, T_OUTLINE);
 	obs_property_set_modified_callback(p, outline_changed);
@@ -937,8 +941,8 @@ static obs_properties_t *get_properties(void *data)
 	p = obs_properties_add_bool(props, S_EXTENTS, T_EXTENTS);
 	obs_property_set_modified_callback(p, extents_modified);
 
-	obs_properties_add_int(props, S_EXTENTS_CX, T_EXTENTS_CX, 32, 8000, 1);
-	obs_properties_add_int(props, S_EXTENTS_CY, T_EXTENTS_CY, 32, 8000, 1);
+	obs_properties_add_int(props, S_EXTENTS_CX, T_EXTENTS_CX, -1, 8000, 1);
+	obs_properties_add_int(props, S_EXTENTS_CY, T_EXTENTS_CY, -1, 8000, 1);
 
 	return props;
 }

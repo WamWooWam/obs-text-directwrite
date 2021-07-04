@@ -109,8 +109,8 @@ struct obs_dwrite_text_source {
 	uint32_t outline_opacity = 100;
 
 	bool use_extents = false;
-	uint32_t extents_cx = 0;
-	uint32_t extents_cy = 0;
+	int32_t extents_cx = 0;
+	int32_t extents_cy = 0;
 
 	int text_transform = 0;
 	int text_trimming = 0;

@@ -29,8 +29,8 @@
 
 #define MIN_SIZE_CX 2.0
 #define MIN_SIZE_CY 2.0
-#define MAX_SIZE_CX 4096.0
-#define MAX_SIZE_CY 4096.0
+#define MAX_SIZE_CX 16384.0
+#define MAX_SIZE_CY 16384.0
 
 using namespace Microsoft::WRL;
 
@@ -113,6 +113,7 @@ struct obs_dwrite_text_source {
 	uint32_t extents_cy = 0;
 
 	int text_transform = 0;
+	int text_trimming = 0;
 
 	bool chatlog_mode = false;
 	int chatlog_lines = 6;

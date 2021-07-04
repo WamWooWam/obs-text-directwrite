@@ -37,6 +37,7 @@
 #define S_ALIGN_LEFT "left"
 #define S_ALIGN_CENTER "center"
 #define S_ALIGN_RIGHT "right"
+#define S_ALIGN_JUSTIFIED "justified"
 
 #define S_VALIGN_TOP "top"
 #define S_VALIGN_CENTER S_ALIGN_CENTER
@@ -51,12 +52,17 @@
 #define S_COLOR_FONTS "color_fonts"
 
 #define S_ANTIALIASING "antialiasing"
-#define S_TRANSFORM "transform"
 
+#define S_TRANSFORM "transform"
 #define S_TRANSFORM_NONE 0
 #define S_TRANSFORM_UPPERCASE 1
 #define S_TRANSFORM_LOWERCASE 2
 #define S_TRANSFORM_STARTCASE 3
+
+#define S_TRIMMING "trimming"
+#define S_TRIMMING_NONE 0
+#define S_TRIMMING_CHARACTER_ELLIPSIS 0
+#define S_TRIMMING_WORD_ELLIPSIS 2
 
 #define T_(v) obs_module_text(v)
 #define T_FONT T_("Font")
@@ -96,6 +102,7 @@
 #define T_ALIGN_LEFT T_("Alignment.Left")
 #define T_ALIGN_CENTER T_("Alignment.Center")
 #define T_ALIGN_RIGHT T_("Alignment.Right")
+#define T_ALIGN_JUSTIFIED T_("Alignment.Justified")
 
 #define T_VALIGN_TOP T_("VerticalAlignment.Top")
 #define T_VALIGN_CENTER T_ALIGN_CENTER
@@ -115,6 +122,11 @@
 #define T_TRANSFORM_UPPERCASE T_("Transform.Uppercase")
 #define T_TRANSFORM_LOWERCASE T_("Transform.Lowercase")
 #define T_TRANSFORM_STARTCASE T_("Transform.Startcase")
+
+#define T_TRIMMING T_("TextTrimming")
+#define T_TRIMMING_NONE T_("TextTrimming.None")
+#define T_TRIMMING_CHARACTER_ELLIPSIS T_("TextTrimming.CharacterEllipsis")
+#define T_TRIMMING_WORD_ELLIPSIS T_("TextTrimming.WordEllipsis")
 
 /* ------------------------------------------------------------------------- */
 
@@ -414,6 +426,26 @@ void obs_dwrite_text_source::RenderText()
 		DWRITE_TEXT_RANGE text_range = {0, TextLength};
 		pTextLayout->SetUnderline(underline, text_range);
 		pTextLayout->SetStrikethrough(strikeout, text_range);
+		pTextLayout->SetWordWrapping(wrap);
+
+		if (text_trimming != S_TRIMMING_NONE) {
+			ComPtr<IDWriteInlineObject> inlineObject;
+			pDWriteFactory->CreateEllipsisTrimmingSign(
+				pTextFormat.Get(), inlineObject.GetAddressOf());
+
+			DWRITE_TRIMMING trimming = {
+				(text_trimming == S_TRIMMING_CHARACTER_ELLIPSIS
+					 ? DWRITE_TRIMMING_GRANULARITY_CHARACTER
+					 : DWRITE_TRIMMING_GRANULARITY_WORD),
+				0, 0};
+
+			pTextLayout->SetTrimming(&trimming, inlineObject.Get());
+		} else {
+			DWRITE_TRIMMING trimming = {
+				DWRITE_TRIMMING_GRANULARITY_NONE, 0, 0};
+			pTextLayout->SetTrimming(&trimming, nullptr);
+		}
+
 		pTextLayout->SetMaxWidth(layout_cx);
 		pTextLayout->SetMaxHeight(layout_cy);
 	}
@@ -436,6 +468,10 @@ void obs_dwrite_text_source::RenderText()
 		pD2DDeviceContext->Clear(
 			D2D1::ColorF(bk_color, bk_opacity / 100.0f));
 		pTextLayout->Draw(NULL, pTextRenderer.Get(), 0, 0);
+		/*pD2DDeviceContext->DrawTextLayout(
+			D2D1::Point2F(0, 0), pTextLayout.Get(),
+			pFillBrush.Get(),
+			D2D1_DRAW_TEXT_OPTIONS_ENABLE_COLOR_FONT);*/
 		hr = pD2DDeviceContext->EndDraw();
 	}
 }
@@ -450,8 +486,7 @@ void obs_dwrite_text_source::TransformText()
 		f.tolower(&text[0], &text[0] + text.size());
 	else if (text_transform == S_TRANSFORM_STARTCASE) {
 		bool upper = true;
-		for (auto it = text.begin(); it != text.end();
-		     ++it) {
+		for (auto it = text.begin(); it != text.end(); ++it) {
 			const wchar_t upper_char = f.toupper(*it);
 			const wchar_t lower_char = f.tolower(*it);
 			if (upper && lower_char != upper_char) {
@@ -539,6 +574,7 @@ inline void obs_dwrite_text_source::Update(obs_data_t *s)
 	bool new_color_fonts = obs_data_get_bool(s, S_COLOR_FONTS);
 	bool new_antialias = obs_data_get_bool(s, S_ANTIALIASING);
 	int new_text_transform = (int)obs_data_get_int(s, S_TRANSFORM);
+	int new_text_trimming = (int)obs_data_get_int(s, S_TRIMMING);
 
 	uint32_t new_bk_color = obs_data_get_uint32(s, S_BKCOLOR);
 	uint32_t new_bk_opacity = obs_data_get_uint32(s, S_BKOPACITY);
@@ -581,6 +617,7 @@ inline void obs_dwrite_text_source::Update(obs_data_t *s)
 	color_fonts = new_color_fonts;
 	antialias = new_antialias;
 	text_transform = new_text_transform;
+	text_trimming = new_text_trimming;
 
 	gradient_mode new_count = gradient_mode::none;
 	if (strcmp(gradient_str, S_GRADIENT_NONE) == 0)
@@ -625,6 +662,8 @@ inline void obs_dwrite_text_source::Update(obs_data_t *s)
 		align = DWRITE_TEXT_ALIGNMENT_CENTER;
 	else if (strcmp(align_str, S_ALIGN_RIGHT) == 0)
 		align = DWRITE_TEXT_ALIGNMENT_TRAILING;
+	else if (strcmp(align_str, S_ALIGN_JUSTIFIED) == 0)
+		align = DWRITE_TEXT_ALIGNMENT_JUSTIFIED;
 	else
 		align = DWRITE_TEXT_ALIGNMENT_LEADING;
 
@@ -686,12 +725,20 @@ inline void obs_dwrite_text_source::Render(gs_effect_t *effect)
 
 OBS_DECLARE_MODULE()
 OBS_MODULE_USE_DEFAULT_LOCALE("obs-text", "en-US")
+MODULE_EXPORT const char *obs_module_description(void)
+{
+	return "Windows DirectWrite/Direct2 text source";
+}
 
-#define set_vis(var, val, show)                           \
-	do {                                              \
-		p = obs_properties_get(props, val);       \
-		obs_property_set_visible(p, var == show); \
+/* clang-format off */
+
+#define set_vis(var, val, show)						\
+	do {											\
+		p = obs_properties_get(props, val);			\
+		obs_property_set_visible(p, var == show);	\
 	} while (false)
+
+/* clang-format on */
 
 static bool use_file_changed(obs_properties_t *props, obs_property_t *p,
 			     obs_data_t *s)
@@ -797,7 +844,6 @@ static obs_properties_t *get_properties(void *data)
 	obs_properties_add_path(props, S_FILE, T_FILE, OBS_PATH_FILE,
 				filter.c_str(), path.c_str());
 
-	
 	p = obs_properties_add_list(props, S_TRANSFORM, T_TRANSFORM,
 				    OBS_COMBO_TYPE_LIST, OBS_COMBO_FORMAT_INT);
 	obs_property_list_add_int(p, T_TRANSFORM_NONE, S_TRANSFORM_NONE);
@@ -807,6 +853,14 @@ static obs_properties_t *get_properties(void *data)
 				  S_TRANSFORM_LOWERCASE);
 	obs_property_list_add_int(p, T_TRANSFORM_STARTCASE,
 				  S_TRANSFORM_STARTCASE);
+
+	p = obs_properties_add_list(props, S_TRIMMING, T_TRIMMING,
+				    OBS_COMBO_TYPE_LIST, OBS_COMBO_FORMAT_INT);
+	obs_property_list_add_int(p, T_TRIMMING_NONE, S_TRIMMING_NONE);
+	obs_property_list_add_int(p, T_TRIMMING_CHARACTER_ELLIPSIS,
+				  S_TRIMMING_CHARACTER_ELLIPSIS);
+	obs_property_list_add_int(p, T_TRIMMING_WORD_ELLIPSIS,
+				  S_TRIMMING_WORD_ELLIPSIS);
 
 	//obs_properties_add_bool(props, S_VERTICAL, T_VERTICAL);
 	obs_properties_add_color(props, S_COLOR, T_COLOR);
@@ -844,6 +898,7 @@ static obs_properties_t *get_properties(void *data)
 	obs_property_list_add_string(p, T_ALIGN_LEFT, S_ALIGN_LEFT);
 	obs_property_list_add_string(p, T_ALIGN_CENTER, S_ALIGN_CENTER);
 	obs_property_list_add_string(p, T_ALIGN_RIGHT, S_ALIGN_RIGHT);
+	obs_property_list_add_string(p, T_ALIGN_JUSTIFIED, S_ALIGN_JUSTIFIED);
 
 	p = obs_properties_add_list(props, S_VALIGN, T_VALIGN,
 				    OBS_COMBO_TYPE_LIST,

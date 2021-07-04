@@ -247,7 +247,10 @@ IFACEMETHODIMP obs_text_renderer::DrawInlineObject(
 	IDWriteInlineObject *inlineObject, BOOL isSideways, BOOL isRightToLeft,
 	IUnknown *clientDrawingEffect)
 {
-	return E_NOTIMPL;
+	//return E_NOTIMPL;
+
+	return inlineObject->Draw(clientDrawingContext, this, originX, originY,
+			   isSideways, isRightToLeft, clientDrawingEffect);
 }
 
 IFACEMETHODIMP obs_text_renderer::IsPixelSnappingDisabled(

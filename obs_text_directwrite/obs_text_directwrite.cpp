@@ -50,7 +50,13 @@
 
 #define S_COLOR_FONTS "color_fonts"
 
-#define S_ANTIALIAS "antialias"
+#define S_ANTIALIASING "antialiasing"
+#define S_TRANSFORM "transform"
+
+#define S_TRANSFORM_NONE 0
+#define S_TRANSFORM_UPPERCASE 1
+#define S_TRANSFORM_LOWERCASE 2
+#define S_TRANSFORM_STARTCASE 3
 
 #define T_(v) obs_module_text(v)
 #define T_FONT T_("Font")
@@ -102,7 +108,13 @@
 #define T_WRAP_MODE_WRAP_CHARACTER T_("WordWrap.WrapCharacter")
 
 #define T_COLOR_FONTS T_("ColorFonts")
-#define T_ANTIALIAS T_("Antialias")
+#define T_ANTIALIASING T_("Antialiasing")
+
+#define T_TRANSFORM T_("Transform")
+#define T_TRANSFORM_NONE T_("Transform.None")
+#define T_TRANSFORM_UPPERCASE T_("Transform.Uppercase")
+#define T_TRANSFORM_LOWERCASE T_("Transform.Lowercase")
+#define T_TRANSFORM_STARTCASE T_("Transform.Startcase")
 
 /* ------------------------------------------------------------------------- */
 
@@ -252,11 +264,14 @@ void obs_dwrite_text_source::UpdateBrush(
 		D2D1_GRADIENT_STOP gradientStops[4];
 		gradientStops[0].color = D2D1::ColorF(color, opacity / 100.0f);
 		gradientStops[0].position = 0.0f;
-		gradientStops[1].color = D2D1::ColorF(color2, opacity2 / 100.0f);
+		gradientStops[1].color =
+			D2D1::ColorF(color2, opacity2 / 100.0f);
 		gradientStops[1].position = gradientStops[0].position + level;
-		gradientStops[2].color = D2D1::ColorF(color3, opacity2 / 100.0f);
+		gradientStops[2].color =
+			D2D1::ColorF(color3, opacity2 / 100.0f);
 		gradientStops[2].position = gradientStops[1].position + level;
-		gradientStops[3].color = D2D1::ColorF(color4, opacity2 / 100.0f);
+		gradientStops[3].color =
+			D2D1::ColorF(color4, opacity2 / 100.0f);
 		gradientStops[3].position = 1.0f;
 
 		hr = pD2DDeviceContext->CreateGradientStopCollection(
@@ -417,12 +432,37 @@ void obs_dwrite_text_source::RenderText()
 		pD2DDeviceContext->SetTextAntialiasMode(
 			antialias ? D2D1_TEXT_ANTIALIAS_MODE_GRAYSCALE
 				  : D2D1_TEXT_ANTIALIAS_MODE_ALIASED);
-				pD2DDeviceContext->SetTransform(
-					D2D1::IdentityMatrix());
+		pD2DDeviceContext->SetTransform(D2D1::IdentityMatrix());
 		pD2DDeviceContext->Clear(
 			D2D1::ColorF(bk_color, bk_opacity / 100.0f));
 		pTextLayout->Draw(NULL, pTextRenderer.Get(), 0, 0);
 		hr = pD2DDeviceContext->EndDraw();
+	}
+}
+
+void obs_dwrite_text_source::TransformText()
+{
+	const std::locale loc = std::locale(obs_get_locale());
+	const std::ctype<wchar_t> &f = std::use_facet<std::ctype<wchar_t>>(loc);
+	if (text_transform == S_TRANSFORM_UPPERCASE)
+		f.toupper(&text[0], &text[0] + text.size());
+	else if (text_transform == S_TRANSFORM_LOWERCASE)
+		f.tolower(&text[0], &text[0] + text.size());
+	else if (text_transform == S_TRANSFORM_STARTCASE) {
+		bool upper = true;
+		for (auto it = text.begin(); it != text.end();
+		     ++it) {
+			const wchar_t upper_char = f.toupper(*it);
+			const wchar_t lower_char = f.tolower(*it);
+			if (upper && lower_char != upper_char) {
+				upper = false;
+				*it = upper_char;
+			} else if (lower_char != upper_char) {
+				*it = lower_char;
+			} else {
+				upper = iswspace(*it);
+			}
+		}
 	}
 }
 
@@ -497,7 +537,8 @@ inline void obs_dwrite_text_source::Update(obs_data_t *s)
 	bool new_strikeout = (font_flags & OBS_FONT_STRIKEOUT) != 0;
 
 	bool new_color_fonts = obs_data_get_bool(s, S_COLOR_FONTS);
-	bool new_antialias = obs_data_get_bool(s, S_ANTIALIAS);
+	bool new_antialias = obs_data_get_bool(s, S_ANTIALIASING);
+	int new_text_transform = (int)obs_data_get_int(s, S_TRANSFORM);
 
 	uint32_t new_bk_color = obs_data_get_uint32(s, S_BKCOLOR);
 	uint32_t new_bk_opacity = obs_data_get_uint32(s, S_BKOPACITY);
@@ -539,9 +580,9 @@ inline void obs_dwrite_text_source::Update(obs_data_t *s)
 	//vertical = new_vertical;
 	color_fonts = new_color_fonts;
 	antialias = new_antialias;
+	text_transform = new_text_transform;
 
 	gradient_mode new_count = gradient_mode::none;
-
 	if (strcmp(gradient_str, S_GRADIENT_NONE) == 0)
 		new_count = gradient_mode::none;
 	else if (strcmp(gradient_str, S_GRADIENT_TWO) == 0)
@@ -572,6 +613,8 @@ inline void obs_dwrite_text_source::Update(obs_data_t *s)
 	} else {
 		text = to_wide(GetMainString(new_text));
 	}
+
+	TransformText();
 
 	use_outline = new_outline;
 	outline_color = new_o_color;
@@ -622,6 +665,7 @@ inline void obs_dwrite_text_source::Tick(float seconds)
 
 		if (file_timestamp != t) {
 			LoadFileText();
+			TransformText();
 			RenderText();
 			file_timestamp = t;
 		}
@@ -753,6 +797,17 @@ static obs_properties_t *get_properties(void *data)
 	obs_properties_add_path(props, S_FILE, T_FILE, OBS_PATH_FILE,
 				filter.c_str(), path.c_str());
 
+	
+	p = obs_properties_add_list(props, S_TRANSFORM, T_TRANSFORM,
+				    OBS_COMBO_TYPE_LIST, OBS_COMBO_FORMAT_INT);
+	obs_property_list_add_int(p, T_TRANSFORM_NONE, S_TRANSFORM_NONE);
+	obs_property_list_add_int(p, T_TRANSFORM_UPPERCASE,
+				  S_TRANSFORM_UPPERCASE);
+	obs_property_list_add_int(p, T_TRANSFORM_LOWERCASE,
+				  S_TRANSFORM_LOWERCASE);
+	obs_property_list_add_int(p, T_TRANSFORM_STARTCASE,
+				  S_TRANSFORM_STARTCASE);
+
 	//obs_properties_add_bool(props, S_VERTICAL, T_VERTICAL);
 	obs_properties_add_color(props, S_COLOR, T_COLOR);
 	obs_properties_add_int_slider(props, S_OPACITY, T_OPACITY, 0, 100, 1);
@@ -807,8 +862,6 @@ static obs_properties_t *get_properties(void *data)
 	obs_property_list_add_string(p, T_WRAP_MODE_WRAP_WHOLE_WORDS,
 				     S_WRAP_MODE_WRAP_WHOLE_WORDS);
 
-	p = obs_properties_add_bool(props, S_ANTIALIAS, T_ANTIALIAS);
-
 	p = obs_properties_add_bool(props, S_OUTLINE, T_OUTLINE);
 	obs_property_set_modified_callback(p, outline_changed);
 
@@ -823,6 +876,7 @@ static obs_properties_t *get_properties(void *data)
 	obs_properties_add_int(props, S_CHATLOG_LINES, T_CHATLOG_LINES, 1, 1000,
 			       1);
 
+	p = obs_properties_add_bool(props, S_ANTIALIASING, T_ANTIALIASING);
 	p = obs_properties_add_bool(props, S_COLOR_FONTS, T_COLOR_FONTS);
 
 	p = obs_properties_add_bool(props, S_EXTENTS, T_EXTENTS);
@@ -882,7 +936,7 @@ bool obs_module_load(void)
 		obs_data_set_default_int(settings, S_EXTENTS_CX, 100);
 		obs_data_set_default_int(settings, S_EXTENTS_CY, 100);
 		obs_data_set_default_bool(settings, S_COLOR_FONTS, true);
-		obs_data_set_default_bool(settings, S_ANTIALIAS, true);
+		obs_data_set_default_bool(settings, S_ANTIALIASING, true);
 
 		obs_data_release(font_obj);
 	};

@@ -1,6 +1,4 @@
 #pragma once
-#define WIN32_LEAN_AND_MEAN
-
 #include <util/platform.h>
 #include <util/util.hpp>
 #include <obs-module.h>
@@ -9,6 +7,7 @@
 #include <algorithm>
 #include <string>
 #include <memory>
+#include <locale>
 #include <math.h>
 #include <d3d11.h>
 #include <dwrite.h>
@@ -113,6 +112,8 @@ struct obs_dwrite_text_source {
 	uint32_t extents_cx = 0;
 	uint32_t extents_cy = 0;
 
+	int text_transform = 0;
+
 	bool chatlog_mode = false;
 	int chatlog_lines = 6;
 
@@ -154,6 +155,7 @@ struct obs_dwrite_text_source {
 	void LoadFileText();
 
 	const char *GetMainString(const char *str);
+	void TransformText();
 
 	inline void Update(obs_data_t *settings);
 	inline void Tick(float seconds);

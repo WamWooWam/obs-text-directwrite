@@ -35,34 +35,34 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
     <ConfigurationType>DynamicLibrary</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
-    <PlatformToolset>v120</PlatformToolset>
+    <PlatformToolset>v142</PlatformToolset>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
     <ConfigurationType>DynamicLibrary</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
-    <PlatformToolset>v120</PlatformToolset>
+    <PlatformToolset>v142</PlatformToolset>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
     <ConfigurationType>DynamicLibrary</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
-    <PlatformToolset>v120</PlatformToolset>
+    <PlatformToolset>v142</PlatformToolset>
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
     <ConfigurationType>DynamicLibrary</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
-    <PlatformToolset>v120</PlatformToolset>
+    <PlatformToolset>v142</PlatformToolset>
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Label="Configuration" Condition="'$(Configuration)|$(Platform)'=='obs_text_directwrite_x64|Win32'">
-    <PlatformToolset>v120</PlatformToolset>
+    <PlatformToolset>v142</PlatformToolset>
   </PropertyGroup>
   <PropertyGroup Label="Configuration" Condition="'$(Configuration)|$(Platform)'=='obs_text_directwrite_x64|x64'">
-    <PlatformToolset>v120</PlatformToolset>
+    <PlatformToolset>v142</PlatformToolset>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
   <ImportGroup Label="ExtensionSettings">
@@ -82,14 +82,14 @@
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <LinkIncremental>true</LinkIncremental>
-    <IncludePath>$(OBS_INCLUDE_PATH);$(VC_IncludePath);$(WindowsSDK_IncludePath);</IncludePath>
-    <LibraryPath>$(OBS_LIB_PATH);$(VC_LibraryPath_x86);$(WindowsSDK_LibraryPath_x86);</LibraryPath>
+    <IncludePath>$(OBS_INCLUDE_PATH);$(VC_IncludePath);$(WindowsSDK_IncludePath);C:\Users\wamwo\Documents\GitHub\obs-studio\libobs;C:\Users\wamwo\Documents\GitHub\obs-studio\build\config</IncludePath>
+    <LibraryPath>$(OBS_LIB_PATH);$(VC_LibraryPath_x86);$(WindowsSDK_LibraryPath_x86)</LibraryPath>
     <TargetName>text-directwrite</TargetName>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <LinkIncremental>true</LinkIncremental>
-    <IncludePath>$(OBS_INCLUDE_PATH);$(VC_IncludePath);$(WindowsSDK_IncludePath);</IncludePath>
-    <LibraryPath>$(OBS_LIBX64_PATH);$(VC_LibraryPath_x64);$(WindowsSDK_LibraryPath_x64);</LibraryPath>
+    <IncludePath>$(OBS_INCLUDE_PATH);$(VC_IncludePath);$(WindowsSDK_IncludePath);C:\Users\wamwo\Documents\GitHub\obs-studio\libobs;C:\Users\wamwo\Documents\GitHub\obs-studio\build\config</IncludePath>
+    <LibraryPath>$(OBS_LIBX64_PATH);$(VC_LibraryPath_x64);$(WindowsSDK_LibraryPath_x64);C:\Users\wamwo\Documents\GitHub\obs-studio\build\libobs\Debug</LibraryPath>
     <TargetName>text-directwrite</TargetName>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
@@ -100,9 +100,12 @@
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <LinkIncremental>false</LinkIncremental>
-    <IncludePath>$(OBS_INCLUDE_PATH);$(VC_IncludePath);$(WindowsSDK_IncludePath);</IncludePath>
-    <LibraryPath>$(OBS_LIBX64_PATH);$(VC_LibraryPath_x64);$(WindowsSDK_LibraryPath_x64);</LibraryPath>
+    <IncludePath>$(OBS_INCLUDE_PATH);$(VC_IncludePath);$(WindowsSDK_IncludePath);C:\Users\wamwo\Documents\GitHub\obs-studio\libobs;C:\Users\wamwo\Documents\GitHub\obs-studio\build\config</IncludePath>
+    <LibraryPath>$(OBS_LIBX64_PATH);$(VC_LibraryPath_x64);$(WindowsSDK_LibraryPath_x64);C:\Users\wamwo\Documents\GitHub\obs-studio\build\libobs\Release</LibraryPath>
     <TargetName>text-directwrite</TargetName>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='obs_text_directwrite_x64|x64'">
+    <IncludePath>$(OBS_INCLUDE_PATH);$(VC_IncludePath);$(WindowsSDK_IncludePath);C:\Users\wamwo\Documents\GitHub\obs-studio\libobs;C:\Users\wamwo\Documents\GitHub\obs-studio\build\config</IncludePath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
@@ -165,14 +168,12 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <Text Include="ReadMe.txt" />
-  </ItemGroup>
-  <ItemGroup>
-    <ClCompile Include="CustomTextRenderer.cpp" />
+    <ClCompile Include="obs_text_renderer.cpp" />
     <ClCompile Include="obs_text_directwrite.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="CustomTextRenderer.h" />
+    <ClInclude Include="obs_text_directwrite.h" />
+    <ClInclude Include="obs_text_renderer.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

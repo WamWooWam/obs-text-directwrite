@@ -1,7 +1,7 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio Express 2013 for Windows Desktop
-VisualStudioVersion = 12.0.31101.0
+# Visual Studio Version 16
+VisualStudioVersion = 16.0.31320.298
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "obs_text_directwrite", "obs_text_directwrite\obs_text_directwrite.vcxproj", "{7E570524-22BE-4122-95DD-F51A8D6B5A1E}"
 EndProject
@@ -15,8 +15,8 @@ Global
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
 		{7E570524-22BE-4122-95DD-F51A8D6B5A1E}.Debug|Win32.ActiveCfg = Debug|Win32
 		{7E570524-22BE-4122-95DD-F51A8D6B5A1E}.Debug|Win32.Build.0 = Debug|Win32
-		{7E570524-22BE-4122-95DD-F51A8D6B5A1E}.Debug|x64.ActiveCfg = Debug|Win32
-		{7E570524-22BE-4122-95DD-F51A8D6B5A1E}.Debug|x64.Build.0 = Debug|Win32
+		{7E570524-22BE-4122-95DD-F51A8D6B5A1E}.Debug|x64.ActiveCfg = Debug|x64
+		{7E570524-22BE-4122-95DD-F51A8D6B5A1E}.Debug|x64.Build.0 = Debug|x64
 		{7E570524-22BE-4122-95DD-F51A8D6B5A1E}.Release|Win32.ActiveCfg = Release|Win32
 		{7E570524-22BE-4122-95DD-F51A8D6B5A1E}.Release|Win32.Build.0 = Release|Win32
 		{7E570524-22BE-4122-95DD-F51A8D6B5A1E}.Release|x64.ActiveCfg = Release|x64
@@ -24,5 +24,8 @@ Global
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {1B08C38E-2D7E-4522-A6DF-943375312FC8}
 	EndGlobalSection
 EndGlobal

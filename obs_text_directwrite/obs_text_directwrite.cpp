@@ -308,13 +308,13 @@ void obs_dwrite_text_source::RenderText()
 	if (pTextRenderer)
 		pTextRenderer.Reset();
 
-	UINT32 TextLength = (UINT32)wcslen(text.c_str());
+	UINT32 text_length = (UINT32)wcslen(text.c_str());
 	HRESULT hr = S_OK;
 
 	float layout_cx = (use_extents && extents_cx != -1) ? extents_cx : INFINITY;
 	float layout_cy = (use_extents && extents_cy != -1) ? extents_cy : INFINITY;
-	float text_cx = 0.0;
-	float text_cy = 0.0;
+	float text_cx = 0.0f;
+	float text_cy = 0.0f;
 
 	SIZE size = {0, 0};
 	UINT32 lines = 1;
@@ -340,12 +340,12 @@ void obs_dwrite_text_source::RenderText()
 		pTextFormat->SetFlowDirection(DWRITE_FLOW_DIRECTION_RIGHT_TO_LEFT);
 		}*/
 
-		hr = pDWriteFactory->CreateTextLayout(text.c_str(), TextLength, pTextFormat.Get(), layout_cx,
+		hr = pDWriteFactory->CreateTextLayout(text.c_str(), text_length, pTextFormat.Get(), layout_cx,
 						      layout_cy, pTextLayout.GetAddressOf());
 	}
 
 	if (SUCCEEDED(hr)) {
-		DWRITE_TEXT_RANGE text_range = {0, TextLength};
+		DWRITE_TEXT_RANGE text_range = {0, text_length};
 		pTextLayout->SetUnderline(underline, text_range);
 		pTextLayout->SetStrikethrough(strikeout, text_range);
 		pTextLayout->SetWordWrapping(wrap);
@@ -455,9 +455,9 @@ void obs_dwrite_text_source::RenderText()
 		UpdateBrush(pD2DDeviceContext, pOutlineBrush.GetAddressOf(), pFillBrush.GetAddressOf(), text_cx,
 			    text_cy / lines);
 
-		pTextRenderer = new (std::nothrow)
-			obs_text_renderer(pDWriteFactory.Get(), pD2DFactory.Get(), pD2DDeviceContext.Get(),
-					  pOutlineBrush.Get(), pFillBrush.Get(), outline_size, color_fonts);
+		pTextRenderer = new obs_text_renderer(pDWriteFactory.Get(), pD2DFactory.Get(),
+						      pD2DDeviceContext.Get(), pOutlineBrush.Get(),
+						      pFillBrush.Get(), outline_size, color_fonts);
 
 		pD2DDeviceContext->BeginDraw();
 		pD2DDeviceContext->SetTextAntialiasMode(antialias ? D2D1_TEXT_ANTIALIAS_MODE_GRAYSCALE
@@ -565,7 +565,7 @@ void obs_dwrite_text_source::TransformText()
 		std::string utf8 = utf8_conv.to_bytes(text);
 		std::string newText;
 
-		GumboOutput *parsed = gumbo_parse(utf8.c_str());
+		GumboOutput *parsed = gumbo_parse_with_options(&kGumboDefaultOptions, utf8.c_str(), utf8.size());
 		newText = ProcessHtml(parsed->root, 0);
 		gumbo_destroy_output(&kGumboDefaultOptions, parsed);
 

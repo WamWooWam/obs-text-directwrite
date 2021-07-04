@@ -8,7 +8,10 @@
 #include <string>
 #include <memory>
 #include <locale>
+#include <vector>
 #include <math.h>
+#include <codecvt>
+#include <optional>
 #include <d3d11.h>
 #include <dwrite.h>
 #include <d2d1.h>
@@ -18,6 +21,7 @@
 #include <wrl.h>
 
 #include "obs_text_renderer.h"
+#include "gumbo/gumbo.h"
 
 #ifndef clamp
 #define clamp(val, min_val, max_val) \
@@ -34,11 +38,22 @@
 
 using namespace Microsoft::WRL;
 
-enum class gradient_mode : uint32_t {
-	none = 0,
-	two_colour = 2,
-	three_colour = 3,
-	four_colour = 4
+enum class gradient_mode : uint32_t { none = 0, two_colour = 2, three_colour = 3, four_colour = 4 };
+
+enum class format_flags {
+	none,
+	bold,
+	italic,
+	underline,
+	strikethrough,
+};
+
+struct dwrite_run {
+	int start;
+	int length;
+	format_flags format;
+	std::optional<float> size;
+	std::optional<uint32_t> color;
 };
 
 struct obs_dwrite_text_source {
@@ -118,11 +133,12 @@ struct obs_dwrite_text_source {
 	bool chatlog_mode = false;
 	int chatlog_lines = 6;
 
+	bool use_html = false;
+	std::vector<dwrite_run> runs;
+
 	/* --------------------------- */
 
-	inline obs_dwrite_text_source(obs_source_t *source_,
-				      obs_data_t *settings)
-		: source(source_)
+	inline obs_dwrite_text_source(obs_source_t *source_, obs_data_t *settings) : source(source_)
 	{
 		obs_enter_graphics();
 		auto hr = InitializeDirectWrite();
@@ -149,14 +165,14 @@ struct obs_dwrite_text_source {
 	void CalculateGradientAxis(float width, float height);
 	HRESULT InitializeDirectWrite();
 	void ReleaseResource();
-	void UpdateBrush(ComPtr<ID2D1DeviceContext4> pRT,
-			 ID2D1Brush **ppOutlineBrush, ID2D1Brush **ppFillBrush,
+	void UpdateBrush(ComPtr<ID2D1DeviceContext4> pRT, ID2D1Brush **ppOutlineBrush, ID2D1Brush **ppFillBrush,
 			 float width, float height);
 	void RenderText();
 	void LoadFileText();
 
 	const char *GetMainString(const char *str);
 	void TransformText();
+	std::string ProcessHtml(GumboNode *node, int position);
 
 	inline void Update(obs_data_t *settings);
 	inline void Tick(float seconds);

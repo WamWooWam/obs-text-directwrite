@@ -183,6 +183,17 @@
     </ClCompile>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="gumbo\attribute.c" />
+    <ClCompile Include="gumbo\char_ref.c" />
+    <ClCompile Include="gumbo\error.c" />
+    <ClCompile Include="gumbo\parser.c" />
+    <ClCompile Include="gumbo\string_buffer.c" />
+    <ClCompile Include="gumbo\string_piece.c" />
+    <ClCompile Include="gumbo\tag.c" />
+    <ClCompile Include="gumbo\tokenizer.c" />
+    <ClCompile Include="gumbo\utf8.c" />
+    <ClCompile Include="gumbo\util.c" />
+    <ClCompile Include="gumbo\vector.c" />
     <ClCompile Include="obs_text_renderer.cpp" />
     <ClCompile Include="obs_text_directwrite.cpp" />
   </ItemGroup>

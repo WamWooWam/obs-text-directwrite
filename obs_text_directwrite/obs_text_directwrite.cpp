@@ -224,33 +224,29 @@ HRESULT obs_dwrite_text_source::InitializeDirectWrite()
 	if (FAILED(hr))
 		return hr;
 
-	ID3D11Device *device = (ID3D11Device *)gs_get_device_obj();
+	ComPtr<ID3D11Device> device((ID3D11Device *)gs_get_device_obj());
 	if (device == nullptr)
 		return E_FAIL;
 
-	IDXGIDevice *dxgi = nullptr;
-	hr = device->QueryInterface(&dxgi);
+	ComPtr<IDXGIDevice> dxgi;
+	device.As(&dxgi);
 
+	ComPtr<ID2D1Device> d2dDevice;
+	hr = pD2DFactory->CreateDevice(dxgi.Get(), d2dDevice.GetAddressOf());
 	if (FAILED(hr))
 		return hr;
 
-	ID2D1Device *d2dDevice = nullptr;
-	hr = pD2DFactory->CreateDevice(dxgi, &d2dDevice);
-	if (FAILED(hr))
-		return hr;
-
-	hr = d2dDevice->QueryInterface(pD2DDevice.GetAddressOf());
-	if (FAILED(hr))
-		return hr;
+	d2dDevice.As(&pD2DDevice);
 
 	hr = pD2DDevice->CreateDeviceContext(D2D1_DEVICE_CONTEXT_OPTIONS_NONE,
-					     &pD2DDeviceContext);
+					     pD2DDeviceContext.GetAddressOf());
 	if (FAILED(hr))
 		return hr;
 
 	hr = DWriteCreateFactory(
 		DWRITE_FACTORY_TYPE_SHARED, __uuidof(IDWriteFactory4),
 		reinterpret_cast<IUnknown **>(pDWriteFactory.GetAddressOf()));
+
 	if (FAILED(hr))
 		return hr;
 
@@ -269,7 +265,7 @@ void obs_dwrite_text_source::UpdateBrush(
 	if ((uint32_t)gradient_count > 0) {
 		CalculateGradientAxis(width, height);
 
-		ID2D1GradientStopCollection *pGradientStops = NULL;
+		ComPtr<ID2D1GradientStopCollection> pGradientStops;
 
 		float level = 1.0 / ((uint32_t)gradient_count - 1);
 
@@ -288,13 +284,13 @@ void obs_dwrite_text_source::UpdateBrush(
 
 		hr = pD2DDeviceContext->CreateGradientStopCollection(
 			gradientStops, (uint32_t)gradient_count, D2D1_GAMMA_2_2,
-			D2D1_EXTEND_MODE_MIRROR, &pGradientStops);
+			D2D1_EXTEND_MODE_MIRROR, pGradientStops.GetAddressOf());
 
 		hr = pD2DDeviceContext->CreateLinearGradientBrush(
 			D2D1::LinearGradientBrushProperties(
 				D2D1::Point2F(gradient_x, gradient_y),
 				D2D1::Point2F(gradient2_x, gradient2_y)),
-			pGradientStops,
+			pGradientStops.Get(),
 			(ID2D1LinearGradientBrush **)ppFillBrush);
 
 	} else {
@@ -396,12 +392,10 @@ void obs_dwrite_text_source::RenderText()
 		tex = gs_texture_create(size.cx, size.cy, GS_BGRA_UNORM, 1,
 					nullptr, GS_RENDER_TARGET);
 
-		ComPtr<ID3D11Texture2D> native_tex(gs_texture_get_obj(tex));
+		ComPtr<ID3D11Texture2D> native_tex(
+			(ID3D11Texture2D *)gs_texture_get_obj(tex));
 		ComPtr<IDXGISurface> native_surface;
 		native_tex.As(&native_surface);
-
-		if (FAILED(hr) || native_surface == nullptr)
-			return;
 
 		D2D1_BITMAP_PROPERTIES1 bitmapProperties =
 			D2D1::BitmapProperties1(

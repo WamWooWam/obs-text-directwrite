@@ -1554,7 +1554,7 @@ static void close_current_select(GumboParser* parser) {
 
 // The list of nodes in the "special" category:
 // http://www.whatwg.org/specs/web-apps/current-work/complete/parsing.html#special
-static bool is_special_node(const GumboNode* node) {
+bool is_special_node(const GumboNode* node) {
   assert(node->type == GUMBO_NODE_ELEMENT || node->type == GUMBO_NODE_TEMPLATE);
   return node_tag_in_set(node,
       (gumbo_tagset){TAG(ADDRESS), TAG(APPLET), TAG(AREA), TAG(ARTICLE),

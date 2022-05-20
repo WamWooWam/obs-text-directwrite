@@ -664,6 +664,8 @@ GumboOutput* gumbo_parse_with_options(
 /** Release the memory used for the parse tree & parse errors. */
 void gumbo_destroy_output(const GumboOptions* options, GumboOutput* output);
 
+bool is_special_node(const GumboNode *node);
+
 #ifdef __cplusplus
 }
 #endif

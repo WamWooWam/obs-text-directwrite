@@ -110,7 +110,7 @@ struct obs_dwrite_text_source {
 	DWRITE_PARAGRAPH_ALIGNMENT valign = DWRITE_PARAGRAPH_ALIGNMENT_NEAR;
 	DWRITE_WORD_WRAPPING wrap = DWRITE_WORD_WRAPPING_WRAP;
 
-	bool bold = false;
+	// bool bold = false;
 	bool italic = false;
 	bool underline = false;
 	bool strikeout = false;

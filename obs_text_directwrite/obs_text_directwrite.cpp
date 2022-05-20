@@ -64,6 +64,30 @@
 #define S_TRIMMING_CHARACTER_ELLIPSIS 0
 #define S_TRIMMING_WORD_ELLIPSIS 2
 
+#define S_FONT_WEIGHT "font_weight"
+#define S_FONT_WEIGHT_100 DWRITE_FONT_WEIGHT_THIN
+#define S_FONT_WEIGHT_200 DWRITE_FONT_WEIGHT_EXTRA_LIGHT
+#define S_FONT_WEIGHT_300 DWRITE_FONT_WEIGHT_LIGHT
+#define S_FONT_WEIGHT_350 DWRITE_FONT_WEIGHT_SEMI_LIGHT
+#define S_FONT_WEIGHT_400 DWRITE_FONT_WEIGHT_NORMAL
+#define S_FONT_WEIGHT_500 DWRITE_FONT_WEIGHT_MEDIUM
+#define S_FONT_WEIGHT_600 DWRITE_FONT_WEIGHT_SEMI_BOLD
+#define S_FONT_WEIGHT_700 DWRITE_FONT_WEIGHT_BOLD
+#define S_FONT_WEIGHT_800 DWRITE_FONT_WEIGHT_EXTRA_BOLD
+#define S_FONT_WEIGHT_900 DWRITE_FONT_WEIGHT_BLACK
+#define S_FONT_WEIGHT_950 DWRITE_FONT_WEIGHT_EXTRA_BLACK
+
+#define S_FONT_STRETCH "font_stretch"
+#define S_FONT_STRETCH_ULTRA_CONDENSED DWRITE_FONT_STRETCH_ULTRA_CONDENSED
+#define S_FONT_STRETCH_EXTRA_CONDENSED DWRITE_FONT_STRETCH_EXTRA_CONDENSED
+#define S_FONT_STRETCH_CONDENSED DWRITE_FONT_STRETCH_CONDENSED
+#define S_FONT_STRETCH_SEMI_CONDENSED DWRITE_FONT_STRETCH_SEMI_CONDENSED
+#define S_FONT_STRETCH_NORMAL DWRITE_FONT_STRETCH_NORMAL
+#define S_FONT_STRETCH_SEMI_EXPANDED DWRITE_FONT_STRETCH_SEMI_EXPANDED
+#define S_FONT_STRETCH_EXPANDED DWRITE_FONT_STRETCH_EXPANDED
+#define S_FONT_STRETCH_EXTRA_EXPANDED DWRITE_FONT_STRETCH_EXTRA_EXPANDED
+#define S_FONT_STRETCH_ULTRA_EXPANDED DWRITE_FONT_STRETCH_ULTRA_EXPANDED
+
 #define S_HTML "html"
 
 #define T_(v) obs_module_text(v)
@@ -130,6 +154,30 @@
 #define T_TRIMMING_CHARACTER_ELLIPSIS T_("TextTrimming.CharacterEllipsis")
 #define T_TRIMMING_WORD_ELLIPSIS T_("TextTrimming.WordEllipsis")
 
+#define T_FONT_WEIGHT T_("FontWeight")
+#define T_FONT_WEIGHT_100 T_("FontWeight.100")
+#define T_FONT_WEIGHT_200 T_("FontWeight.200")
+#define T_FONT_WEIGHT_300 T_("FontWeight.300")
+#define T_FONT_WEIGHT_350 T_("FontWeight.350")
+#define T_FONT_WEIGHT_400 T_("FontWeight.400")
+#define T_FONT_WEIGHT_500 T_("FontWeight.500")
+#define T_FONT_WEIGHT_600 T_("FontWeight.600")
+#define T_FONT_WEIGHT_700 T_("FontWeight.700")
+#define T_FONT_WEIGHT_800 T_("FontWeight.800")
+#define T_FONT_WEIGHT_900 T_("FontWeight.900")
+#define T_FONT_WEIGHT_950 T_("FontWeight.950")
+
+#define T_FONT_STRETCH T_("FontStretch")
+#define T_FONT_STRETCH_ULTRA_CONDENSED T_("FontStretch.UltraCondensed")
+#define T_FONT_STRETCH_EXTRA_CONDENSED T_("FontStretch.ExtraCondensed")
+#define T_FONT_STRETCH_CONDENSED T_("FontStretch.Condensed")
+#define T_FONT_STRETCH_SEMI_CONDENSED T_("FontStretch.SemiCondensed")
+#define T_FONT_STRETCH_NORMAL T_("FontStretch.Normal")
+#define T_FONT_STRETCH_SEMI_EXPANDED T_("FontStretch.SemiExpanded")
+#define T_FONT_STRETCH_EXPANDED T_("FontStretch.Expanded")
+#define T_FONT_STRETCH_EXTRA_EXPANDED T_("FontStretch.ExtraExpanded")
+#define T_FONT_STRETCH_ULTRA_EXPANDED T_("FontStretch.UltraExpanded")
+
 #define T_HTML T_("Html")
 
 /* ------------------------------------------------------------------------- */
@@ -171,11 +219,6 @@ static time_t get_modified_timestamp(const char *filename)
 
 void obs_dwrite_text_source::UpdateFont()
 {
-	if (bold)
-		weight = DWRITE_FONT_WEIGHT::DWRITE_FONT_WEIGHT_BOLD;
-	else
-		weight = DWRITE_FONT_WEIGHT::DWRITE_FONT_WEIGHT_REGULAR;
-
 	if (italic)
 		style = DWRITE_FONT_STYLE::DWRITE_FONT_STYLE_ITALIC;
 	else
@@ -465,10 +508,6 @@ void obs_dwrite_text_source::RenderText()
 		pD2DDeviceContext->SetTransform(D2D1::IdentityMatrix());
 		pD2DDeviceContext->Clear(D2D1::ColorF(bk_color, bk_opacity / 100.0f));
 		pTextLayout->Draw(NULL, pTextRenderer.Get(), 0, 0);
-		/*pD2DDeviceContext->DrawTextLayout(
-			D2D1::Point2F(0, 0), pTextLayout.Get(),
-			pFillBrush.Get(),
-			D2D1_DRAW_TEXT_OPTIONS_ENABLE_COLOR_FONT);*/
 		hr = pD2DDeviceContext->EndDraw();
 	}
 }
@@ -503,7 +542,7 @@ std::string obs_dwrite_text_source::ProcessHtml(GumboNode *node, int position)
 			}
 
 			for (size_t j = 0; j < node->v.element.attributes.length; j++) {
-				auto attribute = (GumboAttribute *)node->v.element.attributes.data[i];
+				auto attribute = (GumboAttribute *)node->v.element.attributes.data[j];
 
 				try {
 					if (strcmpi(attribute->name, "size") == 0 &&
@@ -520,7 +559,14 @@ std::string obs_dwrite_text_source::ProcessHtml(GumboNode *node, int position)
 				//}
 			}
 
-			const std::string text = ProcessHtml(child, position + content_length);
+			std::string text = ProcessHtml(child, position + content_length);
+			if (node->v.element.tag == GUMBO_TAG_BR || node->v.element.tag == GUMBO_TAG_P ||
+			    node->v.element.tag == GUMBO_TAG_H1 || node->v.element.tag == GUMBO_TAG_H2 ||
+			    node->v.element.tag == GUMBO_TAG_H3 || node->v.element.tag == GUMBO_TAG_H4 ||
+			    node->v.element.tag == GUMBO_TAG_H5 || node->v.element.tag == GUMBO_TAG_H6 ||
+			    node->v.element.tag == GUMBO_TAG_DIV) {
+				text.append("\r\n");
+			}
 
 			run.length = utf8_conv.from_bytes(text).length();
 
@@ -565,7 +611,8 @@ void obs_dwrite_text_source::TransformText()
 		std::string utf8 = utf8_conv.to_bytes(text);
 		std::string newText;
 
-		GumboOutput *parsed = gumbo_parse_with_options(&kGumboDefaultOptions, utf8.c_str(), utf8.size());
+		GumboOutput *parsed =
+			gumbo_parse_with_options(&kGumboDefaultOptions, utf8.c_str(), utf8.size());
 		newText = ProcessHtml(parsed->root, 0);
 		gumbo_destroy_output(&kGumboDefaultOptions, parsed);
 
@@ -638,15 +685,19 @@ inline void obs_dwrite_text_source::Update(obs_data_t *s)
 	const char *font_face = obs_data_get_string(font_obj, "face");
 	int font_size = (int)obs_data_get_int(font_obj, "size");
 	int64_t font_flags = obs_data_get_int(font_obj, "flags");
-	bool new_bold = (font_flags & OBS_FONT_BOLD) != 0;
+	//bool new_bold = (font_flags & OBS_FONT_BOLD) != 0;
 	bool new_italic = (font_flags & OBS_FONT_ITALIC) != 0;
 	bool new_underline = (font_flags & OBS_FONT_UNDERLINE) != 0;
 	bool new_strikeout = (font_flags & OBS_FONT_STRIKEOUT) != 0;
 
 	bool new_color_fonts = obs_data_get_bool(s, S_COLOR_FONTS);
 	bool new_antialias = obs_data_get_bool(s, S_ANTIALIASING);
+
 	int new_text_transform = (int)obs_data_get_int(s, S_TRANSFORM);
 	int new_text_trimming = (int)obs_data_get_int(s, S_TRIMMING);
+
+	int new_font_weight = (int)obs_data_get_int(s, S_FONT_WEIGHT);
+	int new_font_stretch = (int)obs_data_get_int(s, S_FONT_STRETCH);
 
 	uint32_t new_bk_color = obs_data_get_uint32(s, S_BKCOLOR);
 	uint32_t new_bk_opacity = obs_data_get_uint32(s, S_BKOPACITY);
@@ -657,15 +708,16 @@ inline void obs_dwrite_text_source::Update(obs_data_t *s)
 
 	std::wstring new_face = to_wide(font_face);
 
-	if (new_face != face || face_size != font_size || new_bold != bold || new_italic != italic ||
-	    new_underline != underline || new_strikeout != strikeout) {
+	if (new_face != face || face_size != font_size || new_font_weight != weight || new_italic != italic ||
+	    new_underline != underline || new_strikeout != strikeout || new_font_stretch != stretch) {
 
 		face = new_face;
 		face_size = font_size;
-		bold = new_bold;
+		weight = (DWRITE_FONT_WEIGHT)new_font_weight;
 		italic = new_italic;
 		underline = new_underline;
 		strikeout = new_strikeout;
+		stretch = (DWRITE_FONT_STRETCH)new_font_stretch;
 
 		UpdateFont();
 	}
@@ -916,6 +968,32 @@ static obs_properties_t *get_properties(void *data)
 	obs_properties_add_color(props, S_COLOR, T_COLOR);
 	obs_properties_add_int_slider(props, S_OPACITY, T_OPACITY, 0, 100, 1);
 
+	p = obs_properties_add_list(props, S_FONT_WEIGHT, T_FONT_WEIGHT, OBS_COMBO_TYPE_LIST,
+				    OBS_COMBO_FORMAT_INT);
+	obs_property_list_add_int(p, T_FONT_WEIGHT_100, S_FONT_WEIGHT_100);
+	obs_property_list_add_int(p, T_FONT_WEIGHT_200, S_FONT_WEIGHT_200);
+	obs_property_list_add_int(p, T_FONT_WEIGHT_300, S_FONT_WEIGHT_300);
+	obs_property_list_add_int(p, T_FONT_WEIGHT_350, S_FONT_WEIGHT_350);
+	obs_property_list_add_int(p, T_FONT_WEIGHT_400, S_FONT_WEIGHT_400);
+	obs_property_list_add_int(p, T_FONT_WEIGHT_500, S_FONT_WEIGHT_500);
+	obs_property_list_add_int(p, T_FONT_WEIGHT_600, S_FONT_WEIGHT_600);
+	obs_property_list_add_int(p, T_FONT_WEIGHT_700, S_FONT_WEIGHT_700);
+	obs_property_list_add_int(p, T_FONT_WEIGHT_800, S_FONT_WEIGHT_800);
+	obs_property_list_add_int(p, T_FONT_WEIGHT_900, S_FONT_WEIGHT_900);
+	obs_property_list_add_int(p, T_FONT_WEIGHT_950, S_FONT_WEIGHT_950);
+
+	p = obs_properties_add_list(props, S_FONT_STRETCH, T_FONT_STRETCH, OBS_COMBO_TYPE_LIST,
+				    OBS_COMBO_FORMAT_INT);
+	obs_property_list_add_int(p, T_FONT_STRETCH_ULTRA_CONDENSED, S_FONT_STRETCH_ULTRA_CONDENSED);
+	obs_property_list_add_int(p, T_FONT_STRETCH_EXTRA_CONDENSED, S_FONT_STRETCH_EXTRA_CONDENSED);
+	obs_property_list_add_int(p, T_FONT_STRETCH_CONDENSED, S_FONT_STRETCH_CONDENSED);
+	obs_property_list_add_int(p, T_FONT_STRETCH_SEMI_CONDENSED, S_FONT_STRETCH_SEMI_CONDENSED);
+	obs_property_list_add_int(p, T_FONT_STRETCH_NORMAL, S_FONT_STRETCH_NORMAL);
+	obs_property_list_add_int(p, T_FONT_STRETCH_SEMI_EXPANDED, S_FONT_STRETCH_SEMI_EXPANDED);
+	obs_property_list_add_int(p, T_FONT_STRETCH_EXPANDED, S_FONT_STRETCH_EXPANDED);
+	obs_property_list_add_int(p, T_FONT_STRETCH_EXTRA_EXPANDED, S_FONT_STRETCH_EXTRA_EXPANDED);
+	obs_property_list_add_int(p, T_FONT_STRETCH_ULTRA_EXPANDED, S_FONT_STRETCH_ULTRA_EXPANDED);
+
 	/*p = obs_properties_add_bool(props, S_GRADIENT, T_GRADIENT);
 	obs_property_set_modified_callback(p, gradient_changed);*/
 
@@ -1016,6 +1094,8 @@ bool obs_module_load(void)
 		obs_data_set_default_string(settings, S_ALIGN, S_ALIGN_LEFT);
 		obs_data_set_default_string(settings, S_VALIGN, S_VALIGN_TOP);
 		obs_data_set_default_string(settings, S_WRAP_MODE, S_WRAP_MODE_WRAP);
+		obs_data_set_default_int(settings, S_FONT_WEIGHT, S_FONT_WEIGHT_400);
+		obs_data_set_default_int(settings, S_FONT_STRETCH, S_FONT_STRETCH_NORMAL);
 		obs_data_set_default_int(settings, S_COLOR, 0xFFFFFF);
 		obs_data_set_default_int(settings, S_OPACITY, 100);
 		obs_data_set_default_int(settings, S_GRADIENT_COLOR, 0xFFFFFF);

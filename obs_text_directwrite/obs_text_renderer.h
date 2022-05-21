@@ -7,13 +7,13 @@
 
 using namespace Microsoft::WRL;
 
-class obs_text_renderer : public IDWriteTextRenderer {
+class OBSTextRenderer : public IDWriteTextRenderer {
 public:
-	obs_text_renderer(IDWriteFactory4 *pDWriteFactory_, ID2D1Factory *pD2DFactory, ID2D1DeviceContext4 *pRT,
+	OBSTextRenderer(IDWriteFactory4 *pDWriteFactory_, ID2D1Factory *pD2DFactory, ID2D1DeviceContext4 *pRT,
 			  ID2D1Brush *pOutlineBrush, ID2D1Brush *pFillBrush, float outlineSize,
 			  bool colorFonts);
 
-	~obs_text_renderer();
+	~OBSTextRenderer();
 
 	IFACEMETHOD(IsPixelSnappingDisabled)
 	(__maybenull void *clientDrawingContext, __out BOOL *isDisabled);

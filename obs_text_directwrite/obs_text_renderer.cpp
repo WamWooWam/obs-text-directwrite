@@ -4,9 +4,9 @@
 
 using namespace Microsoft::WRL;
 
-obs_text_renderer::obs_text_renderer(IDWriteFactory4 *pDWriteFactory_, ID2D1Factory *pD2DFactory_,
-				     ID2D1DeviceContext4 *pDeviceContext_, ID2D1Brush *pOutlineBrush_,
-				     ID2D1Brush *pFillBrush_, float outlineSize_, bool colorFonts_)
+OBSTextRenderer::OBSTextRenderer(IDWriteFactory4 *pDWriteFactory_, ID2D1Factory *pD2DFactory_,
+				 ID2D1DeviceContext4 *pDeviceContext_, ID2D1Brush *pOutlineBrush_,
+				 ID2D1Brush *pFillBrush_, float outlineSize_, bool colorFonts_)
 	: cRefCount_(0),
 	  pD2DFactory(pD2DFactory_),
 	  pDWriteFactory(pDWriteFactory_),
@@ -19,13 +19,13 @@ obs_text_renderer::obs_text_renderer(IDWriteFactory4 *pDWriteFactory_, ID2D1Fact
 	pDeviceContext_->CreateSolidColorBrush(D2D1::ColorF(D2D1::ColorF::Black), pTempBrush.GetAddressOf());
 }
 
-obs_text_renderer::~obs_text_renderer() {}
+OBSTextRenderer::~OBSTextRenderer() {}
 
-IFACEMETHODIMP obs_text_renderer::DrawGlyphRun(__maybenull void *clientDrawingContext, FLOAT baselineOriginX,
-					       FLOAT baselineOriginY, DWRITE_MEASURING_MODE measuringMode,
-					       __in DWRITE_GLYPH_RUN const *glyphRun,
-					       __in DWRITE_GLYPH_RUN_DESCRIPTION const *glyphRunDescription,
-					       IUnknown *clientDrawingEffect)
+IFACEMETHODIMP OBSTextRenderer::DrawGlyphRun(__maybenull void *clientDrawingContext, FLOAT baselineOriginX,
+					     FLOAT baselineOriginY, DWRITE_MEASURING_MODE measuringMode,
+					     __in DWRITE_GLYPH_RUN const *glyphRun,
+					     __in DWRITE_GLYPH_RUN_DESCRIPTION const *glyphRunDescription,
+					     IUnknown *clientDrawingEffect)
 {
 	{
 		HRESULT hr = DWRITE_E_NOCOLOR;
@@ -143,9 +143,9 @@ IFACEMETHODIMP obs_text_renderer::DrawGlyphRun(__maybenull void *clientDrawingCo
 }
 
 IFACEMETHODIMP
-obs_text_renderer::DrawUnderline(__maybenull void *clientDrawingContext, FLOAT baselineOriginX,
-				 FLOAT baselineOriginY, __in DWRITE_UNDERLINE const *underline,
-				 IUnknown *clientDrawingEffect)
+OBSTextRenderer::DrawUnderline(__maybenull void *clientDrawingContext, FLOAT baselineOriginX,
+			       FLOAT baselineOriginY, __in DWRITE_UNDERLINE const *underline,
+			       IUnknown *clientDrawingEffect)
 {
 	HRESULT hr;
 
@@ -173,10 +173,10 @@ obs_text_renderer::DrawUnderline(__maybenull void *clientDrawingContext, FLOAT b
 	return S_OK;
 }
 
-IFACEMETHODIMP obs_text_renderer::DrawStrikethrough(__maybenull void *clientDrawingContext,
-						    FLOAT baselineOriginX, FLOAT baselineOriginY,
-						    __in DWRITE_STRIKETHROUGH const *strikethrough,
-						    IUnknown *clientDrawingEffect)
+IFACEMETHODIMP OBSTextRenderer::DrawStrikethrough(__maybenull void *clientDrawingContext, FLOAT baselineOriginX,
+						  FLOAT baselineOriginY,
+						  __in DWRITE_STRIKETHROUGH const *strikethrough,
+						  IUnknown *clientDrawingEffect)
 {
 	HRESULT hr;
 
@@ -204,10 +204,10 @@ IFACEMETHODIMP obs_text_renderer::DrawStrikethrough(__maybenull void *clientDraw
 	return S_OK;
 }
 
-IFACEMETHODIMP obs_text_renderer::DrawInlineObject(__maybenull void *clientDrawingContext, FLOAT originX,
-						   FLOAT originY, IDWriteInlineObject *inlineObject,
-						   BOOL isSideways, BOOL isRightToLeft,
-						   IUnknown *clientDrawingEffect)
+IFACEMETHODIMP OBSTextRenderer::DrawInlineObject(__maybenull void *clientDrawingContext, FLOAT originX,
+						 FLOAT originY, IDWriteInlineObject *inlineObject,
+						 BOOL isSideways, BOOL isRightToLeft,
+						 IUnknown *clientDrawingEffect)
 {
 	//return E_NOTIMPL;
 
@@ -215,15 +215,15 @@ IFACEMETHODIMP obs_text_renderer::DrawInlineObject(__maybenull void *clientDrawi
 				  clientDrawingEffect);
 }
 
-IFACEMETHODIMP obs_text_renderer::IsPixelSnappingDisabled(__maybenull void *clientDrawingContext,
-							  __out BOOL *isDisabled)
+IFACEMETHODIMP OBSTextRenderer::IsPixelSnappingDisabled(__maybenull void *clientDrawingContext,
+							__out BOOL *isDisabled)
 {
 	*isDisabled = FALSE;
 	return S_OK;
 }
 
 IFACEMETHODIMP
-obs_text_renderer::GetCurrentTransform(__maybenull void *clientDrawingContext, __out DWRITE_MATRIX *transform)
+OBSTextRenderer::GetCurrentTransform(__maybenull void *clientDrawingContext, __out DWRITE_MATRIX *transform)
 {
 	//forward the render target's transform
 	pDeviceContext->GetTransform(reinterpret_cast<D2D1_MATRIX_3X2_F *>(transform));
@@ -231,18 +231,18 @@ obs_text_renderer::GetCurrentTransform(__maybenull void *clientDrawingContext, _
 }
 
 IFACEMETHODIMP
-obs_text_renderer::GetPixelsPerDip(__maybenull void *clientDrawingContext, __out FLOAT *pixelsPerDip)
+OBSTextRenderer::GetPixelsPerDip(__maybenull void *clientDrawingContext, __out FLOAT *pixelsPerDip)
 {
 	*pixelsPerDip = 1.0f;
 	return S_OK;
 }
 
-IFACEMETHODIMP_(unsigned long) obs_text_renderer::AddRef()
+IFACEMETHODIMP_(unsigned long) OBSTextRenderer::AddRef()
 {
 	return InterlockedIncrement(&cRefCount_);
 }
 
-IFACEMETHODIMP_(unsigned long) obs_text_renderer::Release()
+IFACEMETHODIMP_(unsigned long) OBSTextRenderer::Release()
 {
 	unsigned long newCount = InterlockedDecrement(&cRefCount_);
 	if (newCount == 0) {
@@ -253,7 +253,7 @@ IFACEMETHODIMP_(unsigned long) obs_text_renderer::Release()
 	return newCount;
 }
 
-IFACEMETHODIMP obs_text_renderer::QueryInterface(IID const &riid, void **ppvObject)
+IFACEMETHODIMP OBSTextRenderer::QueryInterface(IID const &riid, void **ppvObject)
 {
 	if (__uuidof(IDWriteTextRenderer) == riid) {
 		*ppvObject = this;

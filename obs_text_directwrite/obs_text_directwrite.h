@@ -21,7 +21,6 @@
 #include <wrl.h>
 
 #include "obs_text_renderer.h"
-#include "gumbo/gumbo.h"
 
 #ifndef clamp
 #define clamp(val, min_val, max_val) \
@@ -75,7 +74,7 @@ struct obs_dwrite_text_source {
 	ComPtr<ID2D1Brush> pOutlineBrush = nullptr;
 	ComPtr<ID2D1Bitmap1> pTarget = nullptr;
 
-	ComPtr<obs_text_renderer> pTextRenderer = nullptr;
+	ComPtr<OBSTextRenderer> pTextRenderer = nullptr;
 
 	bool read_from_file = false;
 	std::string file;
@@ -141,7 +140,7 @@ struct obs_dwrite_text_source {
 	inline obs_dwrite_text_source(obs_source_t *source_, obs_data_t *settings) : source(source_)
 	{
 		obs_enter_graphics();
-		auto hr = InitializeDirectWrite();
+		auto hr = initialize_directwrite();
 		obs_leave_graphics();
 
 		if (FAILED(hr))
@@ -158,21 +157,21 @@ struct obs_dwrite_text_source {
 			obs_leave_graphics();
 		}
 
-		ReleaseResource();
+		release();
 	}
 
-	void UpdateFont();
-	void CalculateGradientAxis(float width, float height);
-	HRESULT InitializeDirectWrite();
-	void ReleaseResource();
-	void UpdateBrush(ComPtr<ID2D1DeviceContext4> pRT, ID2D1Brush **ppOutlineBrush, ID2D1Brush **ppFillBrush,
-			 float width, float height);
-	void RenderText();
-	void LoadFileText();
+	HRESULT initialize_directwrite();
+	void release();
 
-	const char *GetMainString(const char *str);
-	void TransformText();
-	std::string ProcessHtml(GumboNode *node, int position);
+	void update_font();
+	void calculate_gradient_axis(float width, float height);
+	void update_brush(ComPtr<ID2D1DeviceContext4> pRT, ID2D1Brush **ppOutlineBrush, ID2D1Brush **ppFillBrush,
+			 float width, float height);
+	void draw_text();
+	void load_file();
+
+	const char *get_string(const char *str);
+	void transform_text();
 
 	inline void Update(obs_data_t *settings);
 	inline void Tick(float seconds);

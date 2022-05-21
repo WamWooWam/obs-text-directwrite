@@ -13,9 +13,6 @@
       <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
       <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
     </Filter>
-    <Filter Include="Gumbo">
-      <UniqueIdentifier>{9e21eba5-a14a-4d09-977b-a9902349d77b}</UniqueIdentifier>
-    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="obs_text_directwrite.cpp">
@@ -23,39 +20,6 @@
     </ClCompile>
     <ClCompile Include="obs_text_renderer.cpp">
       <Filter>Source FIles</Filter>
-    </ClCompile>
-    <ClCompile Include="gumbo\parser.c">
-      <Filter>Gumbo</Filter>
-    </ClCompile>
-    <ClCompile Include="gumbo\string_buffer.c">
-      <Filter>Gumbo</Filter>
-    </ClCompile>
-    <ClCompile Include="gumbo\string_piece.c">
-      <Filter>Gumbo</Filter>
-    </ClCompile>
-    <ClCompile Include="gumbo\tag.c">
-      <Filter>Gumbo</Filter>
-    </ClCompile>
-    <ClCompile Include="gumbo\tokenizer.c">
-      <Filter>Gumbo</Filter>
-    </ClCompile>
-    <ClCompile Include="gumbo\utf8.c">
-      <Filter>Gumbo</Filter>
-    </ClCompile>
-    <ClCompile Include="gumbo\util.c">
-      <Filter>Gumbo</Filter>
-    </ClCompile>
-    <ClCompile Include="gumbo\vector.c">
-      <Filter>Gumbo</Filter>
-    </ClCompile>
-    <ClCompile Include="gumbo\attribute.c">
-      <Filter>Gumbo</Filter>
-    </ClCompile>
-    <ClCompile Include="gumbo\char_ref.c">
-      <Filter>Gumbo</Filter>
-    </ClCompile>
-    <ClCompile Include="gumbo\error.c">
-      <Filter>Gumbo</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

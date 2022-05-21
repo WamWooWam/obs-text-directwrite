@@ -90,6 +90,10 @@
 
 #define S_HTML "html"
 
+#define S_FONT_FACE "face"
+#define S_FONT_SIZE "size"
+#define S_FONT_FLAGS "flags"
+
 #define T_(v) obs_module_text(v)
 #define T_FONT T_("Font")
 #define T_USE_FILE T_("ReadFromFile")
@@ -217,50 +221,8 @@ static time_t get_modified_timestamp(const char *filename)
 	return stats.st_mtime;
 }
 
-void obs_dwrite_text_source::UpdateFont()
-{
-	if (italic)
-		style = DWRITE_FONT_STYLE::DWRITE_FONT_STYLE_ITALIC;
-	else
-		style = DWRITE_FONT_STYLE::DWRITE_FONT_STYLE_NORMAL;
-}
 
-void obs_dwrite_text_source::CalculateGradientAxis(float width, float height)
-{
-	if (width <= 0.0 || height <= 0.0)
-		return;
-
-	float angle = atan(height / width) * 180.0 / M_PI;
-
-	if (gradient_dir <= angle || gradient_dir > 360.0 - angle) {
-		float y = width / 2 * tan(gradient_dir * M_PI / 180.0);
-		gradient_x = width;
-		gradient_y = height / 2 - y;
-		gradient2_x = 0;
-		gradient2_y = height / 2 + y;
-
-	} else if (gradient_dir <= 180.0 - angle && gradient_dir > angle) {
-		float x = height / 2 * tan((90.0 - gradient_dir) * M_PI / 180.0);
-		gradient_x = width / 2 + x;
-		gradient_y = 0;
-		gradient2_x = width / 2 - x;
-		gradient2_y = height;
-	} else if (gradient_dir <= 180.0 + angle && gradient_dir > 180.0 - angle) {
-		float y = width / 2 * tan(gradient_dir * M_PI / 180.0);
-		gradient_x = 0;
-		gradient_y = height / 2 + y;
-		gradient2_x = width;
-		gradient2_y = height / 2 - y;
-	} else {
-		float x = height / 2 * tan((270.0 - gradient_dir) * M_PI / 180.0);
-		gradient_x = width / 2 - x;
-		gradient_y = height;
-		gradient2_x = width / 2 + x;
-		gradient2_y = 0;
-	}
-}
-
-HRESULT obs_dwrite_text_source::InitializeDirectWrite()
+HRESULT obs_dwrite_text_source::initialize_directwrite()
 {
 	HRESULT hr = S_OK;
 	hr = D2D1CreateFactory(D2D1_FACTORY_TYPE_SINGLE_THREADED, pD2DFactory.GetAddressOf());
@@ -295,16 +257,58 @@ HRESULT obs_dwrite_text_source::InitializeDirectWrite()
 	return hr;
 }
 
-void obs_dwrite_text_source::ReleaseResource() {}
+void obs_dwrite_text_source::release() {}
 
-void obs_dwrite_text_source::UpdateBrush(ComPtr<ID2D1DeviceContext4> pD2DDeviceContext,
+void obs_dwrite_text_source::update_font()
+{
+	if (italic)
+		style = DWRITE_FONT_STYLE::DWRITE_FONT_STYLE_ITALIC;
+	else
+		style = DWRITE_FONT_STYLE::DWRITE_FONT_STYLE_NORMAL;
+}
+
+void obs_dwrite_text_source::calculate_gradient_axis(float width, float height)
+{
+	if (width <= 0.0 || height <= 0.0)
+		return;
+
+	float angle = atan(height / width) * 180.0 / M_PI;
+
+	if (gradient_dir <= angle || gradient_dir > 360.0 - angle) {
+		float y = width / 2 * tan(gradient_dir * M_PI / 180.0);
+		gradient_x = width;
+		gradient_y = height / 2 - y;
+		gradient2_x = 0;
+		gradient2_y = height / 2 + y;
+
+	} else if (gradient_dir <= 180.0 - angle && gradient_dir > angle) {
+		float x = height / 2 * tan((90.0 - gradient_dir) * M_PI / 180.0);
+		gradient_x = width / 2 + x;
+		gradient_y = 0;
+		gradient2_x = width / 2 - x;
+		gradient2_y = height;
+	} else if (gradient_dir <= 180.0 + angle && gradient_dir > 180.0 - angle) {
+		float y = width / 2 * tan(gradient_dir * M_PI / 180.0);
+		gradient_x = 0;
+		gradient_y = height / 2 + y;
+		gradient2_x = width;
+		gradient2_y = height / 2 - y;
+	} else {
+		float x = height / 2 * tan((270.0 - gradient_dir) * M_PI / 180.0);
+		gradient_x = width / 2 - x;
+		gradient_y = height;
+		gradient2_x = width / 2 + x;
+		gradient2_y = 0;
+	}
+}
+void obs_dwrite_text_source::update_brush(ComPtr<ID2D1DeviceContext4> pD2DDeviceContext,
 					 ID2D1Brush **ppOutlineBrush, ID2D1Brush **ppFillBrush, float width,
 					 float height)
 {
 	HRESULT hr;
 
 	if ((uint32_t)gradient_count > 0) {
-		CalculateGradientAxis(width, height);
+		calculate_gradient_axis(width, height);
 
 		ComPtr<ID2D1GradientStopCollection> pGradientStops;
 
@@ -346,7 +350,7 @@ void obs_dwrite_text_source::UpdateBrush(ComPtr<ID2D1DeviceContext4> pD2DDeviceC
 	}
 }
 
-void obs_dwrite_text_source::RenderText()
+void obs_dwrite_text_source::draw_text()
 {
 	if (pTextRenderer)
 		pTextRenderer.Reset();
@@ -376,12 +380,6 @@ void obs_dwrite_text_source::RenderText()
 		pTextFormat->SetTextAlignment(align);
 		pTextFormat->SetParagraphAlignment(valign);
 		pTextFormat->SetWordWrapping(wrap);
-
-		/*if (vertical)
-		{
-		pTextFormat->SetReadingDirection(DWRITE_READING_DIRECTION_TOP_TO_BOTTOM);
-		pTextFormat->SetFlowDirection(DWRITE_FLOW_DIRECTION_RIGHT_TO_LEFT);
-		}*/
 
 		hr = pDWriteFactory->CreateTextLayout(text.c_str(), text_length, pTextFormat.Get(), layout_cx,
 						      layout_cy, pTextLayout.GetAddressOf());
@@ -487,6 +485,7 @@ void obs_dwrite_text_source::RenderText()
 			return;
 
 		pD2DDeviceContext->SetTarget(pTarget.Get());
+		pD2DDeviceContext->SetTextAntialiasMode(D2D1_TEXT_ANTIALIAS_MODE_GRAYSCALE);
 
 		obs_leave_graphics();
 
@@ -495,10 +494,10 @@ void obs_dwrite_text_source::RenderText()
 	}
 
 	if (SUCCEEDED(hr)) {
-		UpdateBrush(pD2DDeviceContext, pOutlineBrush.GetAddressOf(), pFillBrush.GetAddressOf(), text_cx,
+		update_brush(pD2DDeviceContext, pOutlineBrush.GetAddressOf(), pFillBrush.GetAddressOf(), text_cx,
 			    text_cy / lines);
 
-		pTextRenderer = new obs_text_renderer(pDWriteFactory.Get(), pD2DFactory.Get(),
+		pTextRenderer = new OBSTextRenderer(pDWriteFactory.Get(), pD2DFactory.Get(),
 						      pD2DDeviceContext.Get(), pOutlineBrush.Get(),
 						      pFillBrush.Get(), outline_size, color_fonts);
 
@@ -512,75 +511,7 @@ void obs_dwrite_text_source::RenderText()
 	}
 }
 
-std::string obs_dwrite_text_source::ProcessHtml(GumboNode *node, int position)
-{
-	std::wstring_convert<std::codecvt_utf8<wchar_t>> utf8_conv;
-	if (node->type == GUMBO_NODE_TEXT) {
-		return std::string(node->v.text.original_text.data, node->v.text.original_text.length);
-	} else if (node->type == GUMBO_NODE_ELEMENT && node->v.element.tag != GUMBO_TAG_SCRIPT &&
-		   node->v.element.tag != GUMBO_TAG_STYLE) {
-		std::string contents = "";
-		GumboVector *children = &node->v.element.children;
-		for (unsigned int i = 0; i < children->length; ++i) {
-			dwrite_run run = {};
-
-			auto child = ((GumboNode *)children->data[i]);
-			auto content_length = utf8_conv.from_bytes(contents).length();
-
-			run.start = position + content_length;
-
-			if (node->v.element.tag == GUMBO_TAG_B || node->v.element.tag == GUMBO_TAG_STRONG) {
-				run.format = format_flags::bold;
-			}
-
-			if (node->v.element.tag == GUMBO_TAG_I || node->v.element.tag == GUMBO_TAG_EM) {
-				run.format = format_flags::italic;
-			}
-
-			if (node->v.element.tag == GUMBO_TAG_U || node->v.element.tag == GUMBO_TAG_INS) {
-				run.format = format_flags::underline;
-			}
-
-			for (size_t j = 0; j < node->v.element.attributes.length; j++) {
-				auto attribute = (GumboAttribute *)node->v.element.attributes.data[j];
-
-				try {
-					if (strcmpi(attribute->name, "size") == 0 &&
-					    strlen(attribute->value) > 0) {
-						run.size = std::stof(attribute->value) / 96.0f * 72.0f;
-					}
-				} catch (...) {
-					// icky but stof is bad.
-				}
-
-				// TODO: parsing colours NotLikeThis
-				//if (strcmpi(attribute->name, "colour")) {
-				//	run.size = std::stof(attribute->value);
-				//}
-			}
-
-			std::string text = ProcessHtml(child, position + content_length);
-			if (node->v.element.tag == GUMBO_TAG_BR || node->v.element.tag == GUMBO_TAG_P ||
-			    node->v.element.tag == GUMBO_TAG_H1 || node->v.element.tag == GUMBO_TAG_H2 ||
-			    node->v.element.tag == GUMBO_TAG_H3 || node->v.element.tag == GUMBO_TAG_H4 ||
-			    node->v.element.tag == GUMBO_TAG_H5 || node->v.element.tag == GUMBO_TAG_H6 ||
-			    node->v.element.tag == GUMBO_TAG_DIV) {
-				text.append("\r\n");
-			}
-
-			run.length = utf8_conv.from_bytes(text).length();
-
-			//if (run.format != format_flags::none)
-			runs.push_back(run);
-			contents.append(text);
-		}
-		return contents;
-	} else {
-		return "";
-	}
-}
-
-void obs_dwrite_text_source::TransformText()
+void obs_dwrite_text_source::transform_text()
 {
 	const std::locale loc = std::locale(obs_get_locale());
 	const std::ctype<wchar_t> &f = std::use_facet<std::ctype<wchar_t>>(loc);
@@ -605,22 +536,9 @@ void obs_dwrite_text_source::TransformText()
 	}
 
 	runs.clear();
-
-	if (use_html) {
-		std::wstring_convert<std::codecvt_utf8<wchar_t>> utf8_conv;
-		std::string utf8 = utf8_conv.to_bytes(text);
-		std::string newText;
-
-		GumboOutput *parsed =
-			gumbo_parse_with_options(&kGumboDefaultOptions, utf8.c_str(), utf8.size());
-		newText = ProcessHtml(parsed->root, 0);
-		gumbo_destroy_output(&kGumboDefaultOptions, parsed);
-
-		text = utf8_conv.from_bytes(newText);
-	}
 }
 
-const char *obs_dwrite_text_source::GetMainString(const char *str)
+const char *obs_dwrite_text_source::get_string(const char *str)
 {
 	if (!str)
 		return "";
@@ -646,10 +564,10 @@ const char *obs_dwrite_text_source::GetMainString(const char *str)
 	return *temp == '\n' ? temp + 1 : temp;
 }
 
-void obs_dwrite_text_source::LoadFileText()
+void obs_dwrite_text_source::load_file()
 {
 	BPtr<char> file_text = os_quick_read_utf8_file(file.c_str());
-	text = to_wide(GetMainString(file_text));
+	text = to_wide(get_string(file_text));
 }
 
 #define obs_data_get_uint32 (uint32_t) obs_data_get_int
@@ -682,9 +600,9 @@ inline void obs_dwrite_text_source::Update(obs_data_t *s)
 	int32_t n_extents_cx = obs_data_get_int(s, S_EXTENTS_CX);
 	int32_t n_extents_cy = obs_data_get_int(s, S_EXTENTS_CY);
 
-	const char *font_face = obs_data_get_string(font_obj, "face");
-	int font_size = (int)obs_data_get_int(font_obj, "size");
-	int64_t font_flags = obs_data_get_int(font_obj, "flags");
+	const char *font_face = obs_data_get_string(font_obj, S_FONT_FACE);
+	int font_size = (int)obs_data_get_int(font_obj, S_FONT_SIZE);
+	int64_t font_flags = obs_data_get_int(font_obj, S_FONT_FLAGS);
 	//bool new_bold = (font_flags & OBS_FONT_BOLD) != 0;
 	bool new_italic = (font_flags & OBS_FONT_ITALIC) != 0;
 	bool new_underline = (font_flags & OBS_FONT_UNDERLINE) != 0;
@@ -702,8 +620,6 @@ inline void obs_dwrite_text_source::Update(obs_data_t *s)
 	uint32_t new_bk_color = obs_data_get_uint32(s, S_BKCOLOR);
 	uint32_t new_bk_opacity = obs_data_get_uint32(s, S_BKOPACITY);
 
-	bool new_html = obs_data_get_bool(s, S_HTML);
-
 	/* ----------------------------- */
 
 	std::wstring new_face = to_wide(font_face);
@@ -719,7 +635,7 @@ inline void obs_dwrite_text_source::Update(obs_data_t *s)
 		strikeout = new_strikeout;
 		stretch = (DWRITE_FONT_STRETCH)new_font_stretch;
 
-		UpdateFont();
+		update_font();
 	}
 
 	/* ----------------------------- */
@@ -743,7 +659,6 @@ inline void obs_dwrite_text_source::Update(obs_data_t *s)
 	antialias = new_antialias;
 	text_transform = new_text_transform;
 	text_trimming = new_text_trimming;
-	use_html = new_html;
 
 	gradient_mode new_count = gradient_mode::none;
 	if (strcmp(gradient_str, S_GRADIENT_NONE) == 0)
@@ -771,13 +686,13 @@ inline void obs_dwrite_text_source::Update(obs_data_t *s)
 	if (read_from_file) {
 		file = new_file;
 		file_timestamp = get_modified_timestamp(new_file);
-		LoadFileText();
+		load_file();
 
 	} else {
-		text = to_wide(GetMainString(new_text));
+		text = to_wide(get_string(new_text));
 	}
 
-	TransformText();
+	transform_text();
 
 	use_outline = new_outline;
 	outline_color = new_o_color;
@@ -809,7 +724,7 @@ inline void obs_dwrite_text_source::Update(obs_data_t *s)
 	else if (strcmp(wrap_str, S_WRAP_MODE_NONE) == 0)
 		wrap = DWRITE_WORD_WRAPPING_NO_WRAP;
 
-	RenderText();
+	draw_text();
 	update_time_elapsed = 0.0f;
 
 	/* ----------------------------- */
@@ -829,21 +744,35 @@ inline void obs_dwrite_text_source::Tick(float seconds)
 		update_time_elapsed = 0.0f;
 
 		if (file_timestamp != t) {
-			LoadFileText();
-			TransformText();
-			RenderText();
+			load_file();
+			transform_text();
+			draw_text();
 			file_timestamp = t;
 		}
 	}
 }
 
-inline void obs_dwrite_text_source::Render(gs_effect_t *effect)
+inline void obs_dwrite_text_source::Render(gs_effect_t *)
 {
 	if (!tex)
 		return;
 
-	gs_effect_set_texture(gs_effect_get_param_by_name(effect, "image"), tex);
+	gs_effect_t *effect = obs_get_base_effect(OBS_EFFECT_DEFAULT);
+	gs_technique_t *tech = gs_effect_get_technique(effect, "Draw");
+
+	const bool previous = gs_framebuffer_srgb_enabled();
+	gs_enable_framebuffer_srgb(true);
+
+	gs_technique_begin(tech);
+	gs_technique_begin_pass(tech, 0);
+
+	gs_effect_set_texture_srgb(gs_effect_get_param_by_name(effect, "image"), tex);
 	gs_draw_sprite(tex, 0, cx, cy);
+
+	gs_technique_end_pass(tech);
+	gs_technique_end(tech);
+
+	gs_enable_framebuffer_srgb(previous);
 }
 
 /* ------------------------------------------------------------------------- */
@@ -852,7 +781,7 @@ OBS_DECLARE_MODULE()
 OBS_MODULE_USE_DEFAULT_LOCALE("obs-text", "en-US")
 MODULE_EXPORT const char *obs_module_description(void)
 {
-	return "Windows DirectWrite/Direct2 text source";
+	return "Windows DirectWrite/Direct2D text source";
 }
 
 /* clang-format off */
@@ -961,8 +890,6 @@ static obs_properties_t *get_properties(void *data)
 
 	obs_properties_add_text(props, S_TEXT, T_TEXT, OBS_TEXT_MULTILINE);
 	obs_properties_add_path(props, S_FILE, T_FILE, OBS_PATH_FILE, filter.c_str(), path.c_str());
-
-	obs_properties_add_bool(props, S_HTML, T_HTML);
 
 	//obs_properties_add_bool(props, S_VERTICAL, T_VERTICAL);
 	obs_properties_add_color(props, S_COLOR, T_COLOR);
@@ -1076,7 +1003,7 @@ bool obs_module_load(void)
 	si.type = OBS_SOURCE_TYPE_INPUT;
 	si.output_flags = OBS_SOURCE_VIDEO;
 	si.get_properties = get_properties;
-	si.icon_type = OBS_ICON_TYPE_TEXT;
+	si.output_flags = OBS_SOURCE_VIDEO | OBS_SOURCE_CUSTOM_DRAW | OBS_SOURCE_SRGB;
 
 	si.get_name = [](void *) { return obs_module_text("TextDirectWrite"); };
 	si.create = [](obs_data_t *settings, obs_source_t *source) {
@@ -1087,8 +1014,8 @@ bool obs_module_load(void)
 	si.get_height = [](void *data) { return reinterpret_cast<obs_dwrite_text_source *>(data)->cy; };
 	si.get_defaults = [](obs_data_t *settings) {
 		obs_data_t *font_obj = obs_data_create();
-		obs_data_set_default_string(font_obj, "face", "Arial");
-		obs_data_set_default_int(font_obj, "size", 256);
+		obs_data_set_default_string(font_obj, S_FONT_FACE, "Arial");
+		obs_data_set_default_int(font_obj, S_FONT_SIZE, 256);
 
 		obs_data_set_default_obj(settings, S_FONT, font_obj);
 		obs_data_set_default_string(settings, S_ALIGN, S_ALIGN_LEFT);
@@ -1113,7 +1040,6 @@ bool obs_module_load(void)
 		obs_data_set_default_int(settings, S_EXTENTS_CY, 100);
 		obs_data_set_default_bool(settings, S_COLOR_FONTS, true);
 		obs_data_set_default_bool(settings, S_ANTIALIASING, true);
-		obs_data_set_default_bool(settings, S_HTML, false);
 
 		obs_data_release(font_obj);
 	};

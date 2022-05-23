@@ -4,27 +4,36 @@
 /* ------------------------------------------------------------------------- */
 
 #define S_FONT "font"
+#define S_FONT_GROUP "font_group"
 #define S_USE_FILE "read_from_file"
 #define S_FILE "file"
 #define S_TEXT "text"
+#define S_TEXT_GROUP "text_group"
 #define S_COLOR "color"
 #define S_GRADIENT "gradient"
-#define S_GRADIENT_NONE "none"
-#define S_GRADIENT_TWO "two_colors"
-#define S_GRADIENT_THREE "three_colors"
-#define S_GRADIENT_FOUR "four_colors"
-#define S_GRADIENT_COLOR "gradient_color"
-#define S_GRADIENT_COLOR2 "gradient_color2"
-#define S_GRADIENT_COLOR3 "gradient_color3"
 #define S_GRADIENT_DIR "gradient_dir"
 #define S_GRADIENT_OPACITY "gradient_opacity"
+
+#define S_GRADIENT_EX "colors"
+#define S_GRADIENT_EX_COUNT "gradient_count"
+#define S_GRADIENT_EX_COLOR "gradient_color_%d"
+#define S_GRADIENT_EX_OFFSET "gradient_offset_%d"
+#define S_GRADIENT_EX_DIR "gradient_dir"
+#define S_GRADIENT_EX_OPACITY "gradient_opacity"
+
 #define S_ALIGN "align"
 #define S_VALIGN "valign"
 #define S_OPACITY "opacity"
+
+#define S_BKGROUP "bk_color"
+#define S_BKOPACITY "bk_opacity"
 #define S_BKCOLOR "bk_color"
 #define S_BKOPACITY "bk_opacity"
+
 //#define S_VERTICAL                      "vertical"
+#define S_LAYOUT "layout"
 #define S_OUTLINE "outline"
+#define S_OUTLINE_GROUP "outline_group"
 #define S_OUTLINE_SIZE "outline_size"
 #define S_OUTLINE_COLOR "outline_color"
 #define S_OUTLINE_OPACITY "outline_opacity"
@@ -88,11 +97,12 @@
 #define S_FONT_STRETCH_EXTRA_EXPANDED DWRITE_FONT_STRETCH_EXTRA_EXPANDED
 #define S_FONT_STRETCH_ULTRA_EXPANDED DWRITE_FONT_STRETCH_ULTRA_EXPANDED
 
-#define S_HTML "html"
-
 #define S_FONT_FACE "face"
 #define S_FONT_SIZE "size"
 #define S_FONT_FLAGS "flags"
+
+#define S_ADVANCED "advanced"
+#define S_HARDWARE_ACCELERATION "hardware_accelerated"
 
 #define T_(v) obs_module_text(v)
 #define T_FONT T_("Font")
@@ -100,22 +110,20 @@
 #define T_FILE T_("TextFile")
 #define T_TEXT T_("Text")
 #define T_COLOR T_("Color")
+#define T_COLORS T_("Colors")
+#define T_OFFSET T_("Offset")
 #define T_GRADIENT T_("Gradient")
-#define T_GRADIENT_NONE T_("Gradient.None")
-#define T_GRADIENT_TWO T_("Gradient.TwoColors")
-#define T_GRADIENT_THREE T_("Gradient.ThreeColors")
-#define T_GRADIENT_FOUR T_("Gradient.FourColors")
-#define T_GRADIENT_COLOR T_("Gradient.Color")
-#define T_GRADIENT_COLOR2 T_("Gradient.Color2")
-#define T_GRADIENT_COLOR3 T_("Gradient.Color3")
 #define T_GRADIENT_DIR T_("Gradient.Direction")
 #define T_GRADIENT_OPACITY T_("Gradient.Opacity")
 #define T_ALIGN T_("Alignment")
 #define T_VALIGN T_("VerticalAlignment")
 #define T_OPACITY T_("Opacity")
+
+#define T_BKGROUP T_("Background")
 #define T_BKCOLOR T_("BkColor")
 #define T_BKOPACITY T_("BkOpacity")
-//#define T_VERTICAL                      T_("Vertical")
+
+#define T_LAYOUT T_("Layout")
 #define T_OUTLINE T_("Outline")
 #define T_OUTLINE_SIZE T_("Outline.Size")
 #define T_OUTLINE_COLOR T_("Outline.Color")
@@ -184,6 +192,12 @@
 
 #define T_HTML T_("Html")
 
+#define T_ADVANCED T_("Advanced")
+#define T_HARDWARE_ACCELERATION T_("UseHardwareAcceleration")
+
+static char *gradient_stop_color_names[MAX_GRADIENT_STOPS];
+static char *gradient_stop_offset_names[MAX_GRADIENT_STOPS];
+
 /* ------------------------------------------------------------------------- */
 
 static inline DWORD get_alpha_val(uint32_t opacity)
@@ -221,7 +235,6 @@ static time_t get_modified_timestamp(const char *filename)
 	return stats.st_mtime;
 }
 
-
 HRESULT obs_dwrite_text_source::initialize_directwrite()
 {
 	HRESULT hr = S_OK;
@@ -248,7 +261,7 @@ HRESULT obs_dwrite_text_source::initialize_directwrite()
 	if (FAILED(hr))
 		return hr;
 
-	hr = DWriteCreateFactory(DWRITE_FACTORY_TYPE_SHARED, __uuidof(IDWriteFactory4),
+	hr = DWriteCreateFactory(DWRITE_FACTORY_TYPE_SHARED, __uuidof(IDWriteFactory2),
 				 reinterpret_cast<IUnknown **>(pDWriteFactory.GetAddressOf()));
 
 	if (FAILED(hr))
@@ -274,55 +287,52 @@ void obs_dwrite_text_source::calculate_gradient_axis(float width, float height)
 
 	float angle = atan(height / width) * 180.0 / M_PI;
 
-	if (gradient_dir <= angle || gradient_dir > 360.0 - angle) {
-		float y = width / 2 * tan(gradient_dir * M_PI / 180.0);
+	if (gradient_angle <= angle || gradient_angle > 360.0 - angle) {
+		float y = width / 2 * tan(gradient_angle * M_PI / 180.0);
 		gradient_x = width;
 		gradient_y = height / 2 - y;
 		gradient2_x = 0;
 		gradient2_y = height / 2 + y;
 
-	} else if (gradient_dir <= 180.0 - angle && gradient_dir > angle) {
-		float x = height / 2 * tan((90.0 - gradient_dir) * M_PI / 180.0);
+	} else if (gradient_angle <= 180.0 - angle && gradient_angle > angle) {
+		float x = height / 2 * tan((90.0 - gradient_angle) * M_PI / 180.0);
 		gradient_x = width / 2 + x;
 		gradient_y = 0;
 		gradient2_x = width / 2 - x;
 		gradient2_y = height;
-	} else if (gradient_dir <= 180.0 + angle && gradient_dir > 180.0 - angle) {
-		float y = width / 2 * tan(gradient_dir * M_PI / 180.0);
+	} else if (gradient_angle <= 180.0 + angle && gradient_angle > 180.0 - angle) {
+		float y = width / 2 * tan(gradient_angle * M_PI / 180.0);
 		gradient_x = 0;
 		gradient_y = height / 2 + y;
 		gradient2_x = width;
 		gradient2_y = height / 2 - y;
 	} else {
-		float x = height / 2 * tan((270.0 - gradient_dir) * M_PI / 180.0);
+		float x = height / 2 * tan((270.0 - gradient_angle) * M_PI / 180.0);
 		gradient_x = width / 2 - x;
 		gradient_y = height;
 		gradient2_x = width / 2 + x;
 		gradient2_y = 0;
 	}
 }
-void obs_dwrite_text_source::update_brush(ComPtr<ID2D1DeviceContext4> pD2DDeviceContext,
-					 ID2D1Brush **ppOutlineBrush, ID2D1Brush **ppFillBrush, float width,
-					 float height)
+
+void obs_dwrite_text_source::update_brush(ComPtr<ID2D1DeviceContext1> pD2DDeviceContext,
+					  ID2D1Brush **ppOutlineBrush, ID2D1Brush **ppFillBrush, float width,
+					  float height)
 {
 	HRESULT hr;
 
-	if ((uint32_t)gradient_count > 0) {
+	if (gradient_count > 1) {
 		calculate_gradient_axis(width, height);
 
 		ComPtr<ID2D1GradientStopCollection> pGradientStops;
 
-		float level = 1.0 / ((uint32_t)gradient_count - 1);
+		float level = 1.0 / (gradient_count - 1);
 
-		D2D1_GRADIENT_STOP gradientStops[4];
-		gradientStops[0].color = D2D1::ColorF(color, opacity / 100.0f);
-		gradientStops[0].position = 0.0f;
-		gradientStops[1].color = D2D1::ColorF(color2, opacity2 / 100.0f);
-		gradientStops[1].position = gradientStops[0].position + level;
-		gradientStops[2].color = D2D1::ColorF(color3, opacity2 / 100.0f);
-		gradientStops[2].position = gradientStops[1].position + level;
-		gradientStops[3].color = D2D1::ColorF(color4, opacity2 / 100.0f);
-		gradientStops[3].position = 1.0f;
+		D2D1_GRADIENT_STOP *gradientStops = new D2D1_GRADIENT_STOP[gradient_count]{};
+		for (size_t i = 0; i < gradient_count; i++) {
+			gradientStops[i].color = D2D1::ColorF(gradient_stops[i].color, opacity / 100.0f);
+			gradientStops[i].position = level * i;
+		}
 
 		hr = pD2DDeviceContext->CreateGradientStopCollection(gradientStops, (uint32_t)gradient_count,
 								     D2D1_GAMMA_2_2, D2D1_EXTEND_MODE_MIRROR,
@@ -334,7 +344,8 @@ void obs_dwrite_text_source::update_brush(ComPtr<ID2D1DeviceContext4> pD2DDevice
 			pGradientStops.Get(), (ID2D1LinearGradientBrush **)ppFillBrush);
 
 	} else {
-		hr = pD2DDeviceContext->CreateSolidColorBrush(D2D1::ColorF(color, opacity / 100.0f),
+		hr = pD2DDeviceContext->CreateSolidColorBrush(D2D1::ColorF(gradient_stops[0].color,
+									   opacity / 100.0f),
 							      (ID2D1SolidColorBrush **)ppFillBrush);
 	}
 
@@ -367,7 +378,6 @@ void obs_dwrite_text_source::draw_text()
 	UINT32 lines = 1;
 
 	if (pDWriteFactory) {
-
 		WCHAR localeName[LOCALE_NAME_MAX_LENGTH] = {0};
 		GetUserDefaultLocaleName(localeName, LOCALE_NAME_MAX_LENGTH);
 
@@ -381,8 +391,9 @@ void obs_dwrite_text_source::draw_text()
 		pTextFormat->SetParagraphAlignment(valign);
 		pTextFormat->SetWordWrapping(wrap);
 
-		hr = pDWriteFactory->CreateTextLayout(text.c_str(), text_length, pTextFormat.Get(), layout_cx,
-						      layout_cy, pTextLayout.GetAddressOf());
+		hr = pDWriteFactory->CreateGdiCompatibleTextLayout(text.c_str(), text_length, pTextFormat.Get(),
+								   layout_cx, layout_cy, 1, nullptr, TRUE,
+								   pTextLayout.GetAddressOf());
 	}
 
 	if (SUCCEEDED(hr)) {
@@ -464,28 +475,11 @@ void obs_dwrite_text_source::draw_text()
 	}
 
 	if (!pTarget || !tex || (LONG)cx != size.cx || (LONG)cy != size.cy) {
+
 		obs_enter_graphics();
-		if (tex)
-			gs_texture_destroy(tex);
 
-		tex = gs_texture_create(size.cx, size.cy, GS_BGRA_UNORM, 1, nullptr, GS_RENDER_TARGET);
-
-		ComPtr<ID3D11Texture2D> native_tex((ID3D11Texture2D *)gs_texture_get_obj(tex));
-		ComPtr<IDXGISurface> native_surface;
-		native_tex.As(&native_surface);
-
-		D2D1_BITMAP_PROPERTIES1 bitmapProperties = D2D1::BitmapProperties1(
-			D2D1_BITMAP_OPTIONS_TARGET | D2D1_BITMAP_OPTIONS_CANNOT_DRAW,
-			D2D1::PixelFormat(DXGI_FORMAT_B8G8R8A8_UNORM, D2D1_ALPHA_MODE_PREMULTIPLIED), 96, 96);
-
-		hr = pD2DDeviceContext->CreateBitmapFromDxgiSurface(native_surface.Get(), &bitmapProperties,
-								    pTarget.ReleaseAndGetAddressOf());
-
-		if (FAILED(hr) || pTarget == nullptr)
+		if (!create_render_target_d3d11(size))
 			return;
-
-		pD2DDeviceContext->SetTarget(pTarget.Get());
-		pD2DDeviceContext->SetTextAntialiasMode(D2D1_TEXT_ANTIALIAS_MODE_GRAYSCALE);
 
 		obs_leave_graphics();
 
@@ -494,12 +488,12 @@ void obs_dwrite_text_source::draw_text()
 	}
 
 	if (SUCCEEDED(hr)) {
-		update_brush(pD2DDeviceContext, pOutlineBrush.GetAddressOf(), pFillBrush.GetAddressOf(), text_cx,
-			    text_cy / lines);
+		update_brush(pD2DDeviceContext, pOutlineBrush.GetAddressOf(), pFillBrush.GetAddressOf(),
+			     text_cx, text_cy / lines);
 
 		pTextRenderer = new OBSTextRenderer(pDWriteFactory.Get(), pD2DFactory.Get(),
-						      pD2DDeviceContext.Get(), pOutlineBrush.Get(),
-						      pFillBrush.Get(), outline_size, color_fonts);
+						    pD2DDeviceContext.Get(), pOutlineBrush.Get(),
+						    pFillBrush.Get(), outline_size, color_fonts);
 
 		pD2DDeviceContext->BeginDraw();
 		pD2DDeviceContext->SetTextAntialiasMode(antialias ? D2D1_TEXT_ANTIALIAS_MODE_GRAYSCALE
@@ -509,6 +503,35 @@ void obs_dwrite_text_source::draw_text()
 		pTextLayout->Draw(NULL, pTextRenderer.Get(), 0, 0);
 		hr = pD2DDeviceContext->EndDraw();
 	}
+}
+
+bool obs_dwrite_text_source::create_render_target_d3d11(SIZE &size)
+{
+	if (tex)
+		gs_texture_destroy(tex);
+
+	tex = gs_texture_create(size.cx, size.cy, GS_BGRA_UNORM, 1, nullptr, GS_RENDER_TARGET);
+
+	if (!tex)
+		return false;
+
+	ComPtr<ID3D11Texture2D> native_tex((ID3D11Texture2D *)gs_texture_get_obj(tex));
+	ComPtr<IDXGISurface> native_surface;
+	native_tex.As(&native_surface);
+
+	D2D1_BITMAP_PROPERTIES1 bitmapProperties = D2D1::BitmapProperties1(
+		D2D1_BITMAP_OPTIONS_TARGET | D2D1_BITMAP_OPTIONS_CANNOT_DRAW,
+		D2D1::PixelFormat(DXGI_FORMAT_B8G8R8A8_UNORM, D2D1_ALPHA_MODE_PREMULTIPLIED), 96, 96);
+
+	HRESULT hr = pD2DDeviceContext->CreateBitmapFromDxgiSurface(native_surface.Get(), &bitmapProperties,
+								pTarget.ReleaseAndGetAddressOf());
+
+	if (FAILED(hr) || pTarget == nullptr)
+		return false;
+
+	pD2DDeviceContext->SetTarget(pTarget.Get());
+
+	return true;
 }
 
 void obs_dwrite_text_source::transform_text()
@@ -571,6 +594,7 @@ void obs_dwrite_text_source::load_file()
 }
 
 #define obs_data_get_uint32 (uint32_t) obs_data_get_int
+#define obs_data_get_int32 (int32_t) obs_data_get_int
 
 inline void obs_dwrite_text_source::Update(obs_data_t *s)
 {
@@ -579,15 +603,7 @@ inline void obs_dwrite_text_source::Update(obs_data_t *s)
 	const char *align_str = obs_data_get_string(s, S_ALIGN);
 	const char *valign_str = obs_data_get_string(s, S_VALIGN);
 	const char *wrap_str = obs_data_get_string(s, S_WRAP_MODE);
-	uint32_t new_color = obs_data_get_uint32(s, S_COLOR);
 	uint32_t new_opacity = obs_data_get_uint32(s, S_OPACITY);
-	const char *gradient_str = obs_data_get_string(s, S_GRADIENT);
-	uint32_t new_color2 = obs_data_get_uint32(s, S_GRADIENT_COLOR);
-	uint32_t new_color3 = obs_data_get_uint32(s, S_GRADIENT_COLOR2);
-	uint32_t new_color4 = obs_data_get_uint32(s, S_GRADIENT_COLOR3);
-	uint32_t new_opacity2 = obs_data_get_uint32(s, S_GRADIENT_OPACITY);
-	float new_grad_dir = (float)obs_data_get_double(s, S_GRADIENT_DIR);
-	//bool new_vertical = obs_data_get_bool(s, S_VERTICAL);
 	bool new_outline = obs_data_get_bool(s, S_OUTLINE);
 	uint32_t new_o_color = obs_data_get_uint32(s, S_OUTLINE_COLOR);
 	uint32_t new_o_opacity = obs_data_get_uint32(s, S_OUTLINE_OPACITY);
@@ -595,13 +611,13 @@ inline void obs_dwrite_text_source::Update(obs_data_t *s)
 	bool new_use_file = obs_data_get_bool(s, S_USE_FILE);
 	const char *new_file = obs_data_get_string(s, S_FILE);
 	bool new_chat_mode = obs_data_get_bool(s, S_CHATLOG_MODE);
-	int new_chat_lines = (int)obs_data_get_int(s, S_CHATLOG_LINES);
+	int32_t new_chat_lines = obs_data_get_int32(s, S_CHATLOG_LINES);
 	bool new_extents = obs_data_get_bool(s, S_EXTENTS);
 	int32_t n_extents_cx = obs_data_get_int(s, S_EXTENTS_CX);
 	int32_t n_extents_cy = obs_data_get_int(s, S_EXTENTS_CY);
 
 	const char *font_face = obs_data_get_string(font_obj, S_FONT_FACE);
-	int font_size = (int)obs_data_get_int(font_obj, S_FONT_SIZE);
+	int32_t font_size = obs_data_get_int32(font_obj, S_FONT_SIZE);
 	int64_t font_flags = obs_data_get_int(font_obj, S_FONT_FLAGS);
 	//bool new_bold = (font_flags & OBS_FONT_BOLD) != 0;
 	bool new_italic = (font_flags & OBS_FONT_ITALIC) != 0;
@@ -611,15 +627,19 @@ inline void obs_dwrite_text_source::Update(obs_data_t *s)
 	bool new_color_fonts = obs_data_get_bool(s, S_COLOR_FONTS);
 	bool new_antialias = obs_data_get_bool(s, S_ANTIALIASING);
 
-	int new_text_transform = (int)obs_data_get_int(s, S_TRANSFORM);
-	int new_text_trimming = (int)obs_data_get_int(s, S_TRIMMING);
+	int32_t new_text_transform = obs_data_get_int32(s, S_TRANSFORM);
+	int32_t new_text_trimming = obs_data_get_int32(s, S_TRIMMING);
 
-	int new_font_weight = (int)obs_data_get_int(s, S_FONT_WEIGHT);
-	int new_font_stretch = (int)obs_data_get_int(s, S_FONT_STRETCH);
+	int32_t new_font_weight = obs_data_get_int32(s, S_FONT_WEIGHT);
+	int32_t new_font_stretch = obs_data_get_int32(s, S_FONT_STRETCH);
 
 	uint32_t new_bk_color = obs_data_get_uint32(s, S_BKCOLOR);
 	uint32_t new_bk_opacity = obs_data_get_uint32(s, S_BKOPACITY);
 
+	int32_t new_gradient_count = obs_data_get_int32(s, S_GRADIENT_EX_COUNT);
+	float new_grad_dir = (float)obs_data_get_double(s, S_GRADIENT_DIR);
+
+	bool new_hardware_acceleration = obs_data_get_bool(s, S_HARDWARE_ACCELERATION);
 	/* ----------------------------- */
 
 	std::wstring new_face = to_wide(font_face);
@@ -639,38 +659,22 @@ inline void obs_dwrite_text_source::Update(obs_data_t *s)
 	}
 
 	/* ----------------------------- */
-
-	new_color = rgb_to_bgr(new_color);
-	new_color2 = rgb_to_bgr(new_color2);
-	new_color3 = rgb_to_bgr(new_color3);
-	new_color4 = rgb_to_bgr(new_color4);
 	new_o_color = rgb_to_bgr(new_o_color);
 	new_bk_color = rgb_to_bgr(new_bk_color);
 
-	color = new_color;
+	hardware_acceleration = new_hardware_acceleration;
+
 	opacity = new_opacity;
-	color2 = new_color2;
-	color3 = new_color3;
-	color4 = new_color4;
-	opacity2 = new_opacity2;
-	gradient_dir = new_grad_dir;
-	//vertical = new_vertical;
+	gradient_angle = new_grad_dir;
 	color_fonts = new_color_fonts;
 	antialias = new_antialias;
 	text_transform = new_text_transform;
 	text_trimming = new_text_trimming;
 
-	gradient_mode new_count = gradient_mode::none;
-	if (strcmp(gradient_str, S_GRADIENT_NONE) == 0)
-		new_count = gradient_mode::none;
-	else if (strcmp(gradient_str, S_GRADIENT_TWO) == 0)
-		new_count = gradient_mode::two_colour;
-	else if (strcmp(gradient_str, S_GRADIENT_THREE) == 0)
-		new_count = gradient_mode::three_colour;
-	else
-		new_count = gradient_mode::four_colour;
-
-	gradient_count = new_count;
+	gradient_count = new_gradient_count;
+	for (size_t i = 0; i < new_gradient_count; i++) {
+		gradient_stops[i].color = rgb_to_bgr(obs_data_get_uint32(s, gradient_stop_color_names[i]));
+	}
 
 	bk_color = new_bk_color;
 	bk_opacity = new_bk_opacity;
@@ -757,22 +761,58 @@ inline void obs_dwrite_text_source::Render(gs_effect_t *)
 	if (!tex)
 		return;
 
+	gs_texture_t *texture = tex;
+	gs_effect_t *effect = obs_get_base_effect(OBS_EFFECT_PREMULTIPLIED_ALPHA);
+	gs_technique_t *tech = gs_effect_get_technique(effect, "Draw");
+	gs_eparam_t *image = gs_effect_get_param_by_name(effect, "image");
+	size_t passes;
+
+	gs_reset_blend_state();
+
+	const bool linear_srgb = gs_get_linear_srgb();
+	const bool previous = gs_framebuffer_srgb_enabled();
+	gs_enable_framebuffer_srgb(false);
+
+	passes = gs_technique_begin(tech);
+
+	for (size_t i = 0; i < passes; i++) {
+		if (gs_technique_begin_pass(tech, i)) {
+			if (linear_srgb)
+				gs_effect_set_texture_srgb(image, texture);
+			else
+				gs_effect_set_texture(image, texture);
+
+			gs_draw_sprite(texture, 0, 0, 0);
+
+			gs_technique_end_pass(tech);
+		}
+	}
+
+	gs_technique_end(tech);
+
+	gs_enable_framebuffer_srgb(previous);
+
+	/*
+		
+	gs_enable_framebuffer_srgb(previous);
 	gs_effect_t *effect = obs_get_base_effect(OBS_EFFECT_DEFAULT);
 	gs_technique_t *tech = gs_effect_get_technique(effect, "Draw");
 
 	const bool previous = gs_framebuffer_srgb_enabled();
-	gs_enable_framebuffer_srgb(true);
+	gs_enable_framebuffer_srgb(false);
 
 	gs_technique_begin(tech);
 	gs_technique_begin_pass(tech, 0);
 
 	gs_effect_set_texture_srgb(gs_effect_get_param_by_name(effect, "image"), tex);
-	gs_draw_sprite(tex, 0, cx, cy);
+	gs_draw_sprite(tex, 0, 0, 0);
 
 	gs_technique_end_pass(tech);
 	gs_technique_end(tech);
 
 	gs_enable_framebuffer_srgb(previous);
+	
+	*/
 }
 
 /* ------------------------------------------------------------------------- */
@@ -823,6 +863,7 @@ static bool chatlog_mode_changed(obs_properties_t *props, obs_property_t *p, obs
 
 static bool gradient_changed(obs_properties_t *props, obs_property_t *p, obs_data_t *s)
 {
+	/*
 	const char *gradient_str = obs_data_get_string(s, S_GRADIENT);
 	gradient_mode mode = gradient_mode::none;
 
@@ -843,7 +884,13 @@ static bool gradient_changed(obs_properties_t *props, obs_property_t *p, obs_dat
 	set_vis(gradient_color2, S_GRADIENT_COLOR2, true);
 	set_vis(gradient_color3, S_GRADIENT_COLOR3, true);
 	set_vis(gradient_color, S_GRADIENT_OPACITY, true);
-	set_vis(gradient_color, S_GRADIENT_DIR, true);
+	set_vis(gradient_color, S_GRADIENT_DIR, true);*/
+
+	int32_t gradient_stops = max(1, min(obs_data_get_int32(s, S_GRADIENT_EX_COUNT), MAX_GRADIENT_STOPS));
+	for (size_t i = 0; i < MAX_GRADIENT_STOPS; i++) {
+		set_vis(i < gradient_stops, gradient_stop_color_names[i], true);
+		//set_vis(i < gradient_stops, gradient_stop_offset_names[i], true);
+	}
 
 	return true;
 }
@@ -867,11 +914,6 @@ static obs_properties_t *get_properties(void *data)
 	obs_properties_t *props = obs_properties_create();
 	obs_property_t *p;
 
-	obs_properties_add_font(props, S_FONT, T_FONT);
-
-	p = obs_properties_add_bool(props, S_USE_FILE, T_USE_FILE);
-	obs_property_set_modified_callback(p, use_file_changed);
-
 	std::string filter;
 	filter += T_FILTER_TEXT_FILES;
 	filter += " (*.txt);;";
@@ -888,14 +930,23 @@ static obs_properties_t *get_properties(void *data)
 			path.resize(slash - path.c_str() + 1);
 	}
 
-	obs_properties_add_text(props, S_TEXT, T_TEXT, OBS_TEXT_MULTILINE);
-	obs_properties_add_path(props, S_FILE, T_FILE, OBS_PATH_FILE, filter.c_str(), path.c_str());
+	// text group
+	obs_properties_t *text_group = obs_properties_create();
+	obs_properties_add_group(props, S_TEXT_GROUP, T_TEXT, OBS_GROUP_NORMAL, text_group);
 
-	//obs_properties_add_bool(props, S_VERTICAL, T_VERTICAL);
-	obs_properties_add_color(props, S_COLOR, T_COLOR);
-	obs_properties_add_int_slider(props, S_OPACITY, T_OPACITY, 0, 100, 1);
+	obs_properties_add_text(text_group, S_TEXT, T_TEXT, OBS_TEXT_MULTILINE);
+	obs_properties_add_path(text_group, S_FILE, T_FILE, OBS_PATH_FILE, filter.c_str(), path.c_str());
 
-	p = obs_properties_add_list(props, S_FONT_WEIGHT, T_FONT_WEIGHT, OBS_COMBO_TYPE_LIST,
+	p = obs_properties_add_bool(text_group, S_USE_FILE, T_USE_FILE);
+	obs_property_set_modified_callback(p, use_file_changed);
+
+	// font group
+	obs_properties_t *font_group = obs_properties_create();
+	obs_properties_add_group(props, S_FONT_GROUP, T_FONT, OBS_GROUP_NORMAL, font_group);
+
+	obs_properties_add_font(font_group, S_FONT, T_FONT);
+
+	p = obs_properties_add_list(font_group, S_FONT_WEIGHT, T_FONT_WEIGHT, OBS_COMBO_TYPE_LIST,
 				    OBS_COMBO_FORMAT_INT);
 	obs_property_list_add_int(p, T_FONT_WEIGHT_100, S_FONT_WEIGHT_100);
 	obs_property_list_add_int(p, T_FONT_WEIGHT_200, S_FONT_WEIGHT_200);
@@ -909,7 +960,7 @@ static obs_properties_t *get_properties(void *data)
 	obs_property_list_add_int(p, T_FONT_WEIGHT_900, S_FONT_WEIGHT_900);
 	obs_property_list_add_int(p, T_FONT_WEIGHT_950, S_FONT_WEIGHT_950);
 
-	p = obs_properties_add_list(props, S_FONT_STRETCH, T_FONT_STRETCH, OBS_COMBO_TYPE_LIST,
+	p = obs_properties_add_list(font_group, S_FONT_STRETCH, T_FONT_STRETCH, OBS_COMBO_TYPE_LIST,
 				    OBS_COMBO_FORMAT_INT);
 	obs_property_list_add_int(p, T_FONT_STRETCH_ULTRA_CONDENSED, S_FONT_STRETCH_ULTRA_CONDENSED);
 	obs_property_list_add_int(p, T_FONT_STRETCH_EXTRA_CONDENSED, S_FONT_STRETCH_EXTRA_CONDENSED);
@@ -921,86 +972,121 @@ static obs_properties_t *get_properties(void *data)
 	obs_property_list_add_int(p, T_FONT_STRETCH_EXTRA_EXPANDED, S_FONT_STRETCH_EXTRA_EXPANDED);
 	obs_property_list_add_int(p, T_FONT_STRETCH_ULTRA_EXPANDED, S_FONT_STRETCH_ULTRA_EXPANDED);
 
-	/*p = obs_properties_add_bool(props, S_GRADIENT, T_GRADIENT);
-	obs_property_set_modified_callback(p, gradient_changed);*/
+	// colours/gradient group
+	obs_properties_t *colors_group = obs_properties_create();
+	obs_properties_add_group(props, S_GRADIENT_EX, T_COLOR, OBS_GROUP_NORMAL, colors_group);
 
-	p = obs_properties_add_list(props, S_GRADIENT, T_GRADIENT, OBS_COMBO_TYPE_LIST,
-				    OBS_COMBO_FORMAT_STRING);
-
-	obs_property_list_add_string(p, T_GRADIENT_NONE, S_GRADIENT_NONE);
-	obs_property_list_add_string(p, T_GRADIENT_TWO, S_GRADIENT_TWO);
-	obs_property_list_add_string(p, T_GRADIENT_THREE, S_GRADIENT_THREE);
-	obs_property_list_add_string(p, T_GRADIENT_FOUR, S_GRADIENT_FOUR);
-
+	p = obs_properties_add_int_slider(colors_group, S_GRADIENT_EX_COUNT, T_COLORS, 1, MAX_GRADIENT_STOPS,
+					  1);
 	obs_property_set_modified_callback(p, gradient_changed);
 
-	obs_properties_add_color(props, S_GRADIENT_COLOR, T_GRADIENT_COLOR);
-	obs_properties_add_color(props, S_GRADIENT_COLOR2, T_GRADIENT_COLOR2);
-	obs_properties_add_color(props, S_GRADIENT_COLOR3, T_GRADIENT_COLOR3);
-	obs_properties_add_int_slider(props, S_GRADIENT_OPACITY, T_GRADIENT_OPACITY, 0, 100, 1);
-	obs_properties_add_float_slider(props, S_GRADIENT_DIR, T_GRADIENT_DIR, 0, 360, 0.1);
+	for (size_t i = 0; i < MAX_GRADIENT_STOPS; i++) {
+		obs_properties_add_color(colors_group, gradient_stop_color_names[i], T_COLOR);
+		//obs_properties_add_float_slider(colors, gradient_stop_offset_names[i], T_OFFSET, 0, 1, 0.01);
+	}
 
-	obs_properties_add_color(props, S_BKCOLOR, T_BKCOLOR);
-	obs_properties_add_int_slider(props, S_BKOPACITY, T_BKOPACITY, 0, 100, 1);
+	obs_properties_add_int_slider(colors_group, S_OPACITY, T_OPACITY, 0, 100, 1);
+	obs_properties_add_float_slider(colors_group, S_GRADIENT_DIR, T_GRADIENT_DIR, 0, 360, 0.1);
 
-	p = obs_properties_add_list(props, S_ALIGN, T_ALIGN, OBS_COMBO_TYPE_LIST, OBS_COMBO_FORMAT_STRING);
+	// background colour/opacity group
+	obs_properties_t *background_group = obs_properties_create();
+	obs_properties_add_group(props, S_BKGROUP, T_BKGROUP, OBS_GROUP_NORMAL, colors_group);
+
+	obs_properties_add_color(background_group, S_BKCOLOR, T_BKCOLOR);
+	obs_properties_add_int_slider(background_group, S_BKOPACITY, T_BKOPACITY, 0, 100, 1);
+
+	// layout group
+	obs_properties_t *layout_group = obs_properties_create();
+	obs_properties_add_group(props, S_LAYOUT, T_LAYOUT, OBS_GROUP_NORMAL, layout_group);
+
+	p = obs_properties_add_list(layout_group, S_ALIGN, T_ALIGN, OBS_COMBO_TYPE_LIST,
+				    OBS_COMBO_FORMAT_STRING);
 	obs_property_list_add_string(p, T_ALIGN_LEFT, S_ALIGN_LEFT);
 	obs_property_list_add_string(p, T_ALIGN_CENTER, S_ALIGN_CENTER);
 	obs_property_list_add_string(p, T_ALIGN_RIGHT, S_ALIGN_RIGHT);
 	obs_property_list_add_string(p, T_ALIGN_JUSTIFIED, S_ALIGN_JUSTIFIED);
 
-	p = obs_properties_add_list(props, S_VALIGN, T_VALIGN, OBS_COMBO_TYPE_LIST, OBS_COMBO_FORMAT_STRING);
+	p = obs_properties_add_list(layout_group, S_VALIGN, T_VALIGN, OBS_COMBO_TYPE_LIST,
+				    OBS_COMBO_FORMAT_STRING);
 	obs_property_list_add_string(p, T_VALIGN_TOP, S_VALIGN_TOP);
 	obs_property_list_add_string(p, T_VALIGN_CENTER, S_VALIGN_CENTER);
 	obs_property_list_add_string(p, T_VALIGN_BOTTOM, S_VALIGN_BOTTOM);
 
-	p = obs_properties_add_list(props, S_TRANSFORM, T_TRANSFORM, OBS_COMBO_TYPE_LIST, OBS_COMBO_FORMAT_INT);
-	obs_property_list_add_int(p, T_TRANSFORM_NONE, S_TRANSFORM_NONE);
-	obs_property_list_add_int(p, T_TRANSFORM_UPPERCASE, S_TRANSFORM_UPPERCASE);
-	obs_property_list_add_int(p, T_TRANSFORM_LOWERCASE, S_TRANSFORM_LOWERCASE);
-	obs_property_list_add_int(p, T_TRANSFORM_STARTCASE, S_TRANSFORM_STARTCASE);
-
-	p = obs_properties_add_list(props, S_WRAP_MODE, T_WRAP_MODE, OBS_COMBO_TYPE_LIST,
+	p = obs_properties_add_list(layout_group, S_WRAP_MODE, T_WRAP_MODE, OBS_COMBO_TYPE_LIST,
 				    OBS_COMBO_FORMAT_STRING);
 	obs_property_list_add_string(p, T_WRAP_MODE_NONE, S_WRAP_MODE_NONE);
 	obs_property_list_add_string(p, T_WRAP_MODE_WRAP, S_WRAP_MODE_WRAP);
 	obs_property_list_add_string(p, T_WRAP_MODE_WRAP_CHARACTER, S_WRAP_MODE_WRAP_CHARACTER);
 	obs_property_list_add_string(p, T_WRAP_MODE_WRAP_WHOLE_WORDS, S_WRAP_MODE_WRAP_WHOLE_WORDS);
 
-	p = obs_properties_add_list(props, S_TRIMMING, T_TRIMMING, OBS_COMBO_TYPE_LIST, OBS_COMBO_FORMAT_INT);
+	p = obs_properties_add_list(layout_group, S_TRIMMING, T_TRIMMING, OBS_COMBO_TYPE_LIST,
+				    OBS_COMBO_FORMAT_INT);
 	obs_property_list_add_int(p, T_TRIMMING_NONE, S_TRIMMING_NONE);
 	obs_property_list_add_int(p, T_TRIMMING_CHARACTER_ELLIPSIS, S_TRIMMING_CHARACTER_ELLIPSIS);
 	obs_property_list_add_int(p, T_TRIMMING_WORD_ELLIPSIS, S_TRIMMING_WORD_ELLIPSIS);
 
-	p = obs_properties_add_bool(props, S_OUTLINE, T_OUTLINE);
-	obs_property_set_modified_callback(p, outline_changed);
+	p = obs_properties_add_list(layout_group, S_TRANSFORM, T_TRANSFORM, OBS_COMBO_TYPE_LIST,
+				    OBS_COMBO_FORMAT_INT);
+	obs_property_list_add_int(p, T_TRANSFORM_NONE, S_TRANSFORM_NONE);
+	obs_property_list_add_int(p, T_TRANSFORM_UPPERCASE, S_TRANSFORM_UPPERCASE);
+	obs_property_list_add_int(p, T_TRANSFORM_LOWERCASE, S_TRANSFORM_LOWERCASE);
+	obs_property_list_add_int(p, T_TRANSFORM_STARTCASE, S_TRANSFORM_STARTCASE);
 
-	obs_properties_add_int(props, S_OUTLINE_SIZE, T_OUTLINE_SIZE, 1, 20, 1);
-	obs_properties_add_color(props, S_OUTLINE_COLOR, T_OUTLINE_COLOR);
-	obs_properties_add_int_slider(props, S_OUTLINE_OPACITY, T_OUTLINE_OPACITY, 0, 100, 1);
-
-	p = obs_properties_add_bool(props, S_CHATLOG_MODE, T_CHATLOG_MODE);
-	obs_property_set_modified_callback(p, chatlog_mode_changed);
-
-	obs_properties_add_int(props, S_CHATLOG_LINES, T_CHATLOG_LINES, 1, 1000, 1);
-
-	p = obs_properties_add_bool(props, S_ANTIALIASING, T_ANTIALIASING);
-	p = obs_properties_add_bool(props, S_COLOR_FONTS, T_COLOR_FONTS);
-
-	p = obs_properties_add_bool(props, S_EXTENTS, T_EXTENTS);
+	p = obs_properties_add_bool(layout_group, S_EXTENTS, T_EXTENTS);
 	obs_property_set_modified_callback(p, extents_modified);
 
-	obs_properties_add_int(props, S_EXTENTS_CX, T_EXTENTS_CX, -1, 8000, 1);
-	obs_properties_add_int(props, S_EXTENTS_CY, T_EXTENTS_CY, -1, 8000, 1);
+	obs_properties_add_int(layout_group, S_EXTENTS_CX, T_EXTENTS_CX, -1, 8000, 1);
+	obs_properties_add_int(layout_group, S_EXTENTS_CY, T_EXTENTS_CY, -1, 8000, 1);
+
+	// outline group
+	obs_properties_t *outline_group = obs_properties_create();
+	obs_properties_add_group(props, S_OUTLINE_GROUP, T_OUTLINE, OBS_GROUP_NORMAL, outline_group);
+
+	p = obs_properties_add_bool(outline_group, S_OUTLINE, T_OUTLINE);
+	obs_property_set_modified_callback(p, outline_changed);
+
+	obs_properties_add_int(outline_group, S_OUTLINE_SIZE, T_OUTLINE_SIZE, 1, 20, 1);
+	obs_properties_add_color(outline_group, S_OUTLINE_COLOR, T_OUTLINE_COLOR);
+	obs_properties_add_int_slider(outline_group, S_OUTLINE_OPACITY, T_OUTLINE_OPACITY, 0, 100, 1);
+
+	// advanced froup
+	obs_properties_t *advanced_group = obs_properties_create();
+	obs_properties_add_group(props, S_ADVANCED, T_ADVANCED, OBS_GROUP_NORMAL, advanced_group);
+
+	p = obs_properties_add_bool(advanced_group, S_CHATLOG_MODE, T_CHATLOG_MODE);
+	obs_property_set_modified_callback(p, chatlog_mode_changed);
+
+	obs_properties_add_int(advanced_group, S_CHATLOG_LINES, T_CHATLOG_LINES, 1, 1000, 1);
+
+	p = obs_properties_add_bool(advanced_group, S_ANTIALIASING, T_ANTIALIASING);
+	p = obs_properties_add_bool(advanced_group, S_COLOR_FONTS, T_COLOR_FONTS);
+	p = obs_properties_add_bool(advanced_group, S_HARDWARE_ACCELERATION, T_HARDWARE_ACCELERATION);
 
 	return props;
 }
 
 bool obs_module_load(void)
 {
+	for (size_t i = 0; i < MAX_GRADIENT_STOPS; i++) {
+		if (gradient_stop_color_names[i] == nullptr) {
+			if (i == 0) {
+				gradient_stop_color_names[i] = S_COLOR;
+			} else {
+				gradient_stop_color_names[i] = new char[32]{0};
+				sprintf(gradient_stop_color_names[i], S_GRADIENT_EX_COLOR, (int)i);
+			}
+		}
+
+		/*if (gradient_stop_offset_names[i] == nullptr) {
+			gradient_stop_offset_names[i] = (char *)calloc(32, sizeof(char));
+			sprintf(gradient_stop_offset_names[i], S_GRADIENT_EX_OFFSET, (int)i);
+		}*/
+	}
+
 	obs_source_info si = {};
 	si.id = "text_directwrite";
 	si.type = OBS_SOURCE_TYPE_INPUT;
+	si.icon_type = OBS_ICON_TYPE_TEXT;
 	si.output_flags = OBS_SOURCE_VIDEO;
 	si.get_properties = get_properties;
 	si.output_flags = OBS_SOURCE_VIDEO | OBS_SOURCE_CUSTOM_DRAW | OBS_SOURCE_SRGB;
@@ -1024,11 +1110,8 @@ bool obs_module_load(void)
 		obs_data_set_default_int(settings, S_FONT_WEIGHT, S_FONT_WEIGHT_400);
 		obs_data_set_default_int(settings, S_FONT_STRETCH, S_FONT_STRETCH_NORMAL);
 		obs_data_set_default_int(settings, S_COLOR, 0xFFFFFF);
+		obs_data_set_default_int(settings, S_GRADIENT_EX_COUNT, 1);
 		obs_data_set_default_int(settings, S_OPACITY, 100);
-		obs_data_set_default_int(settings, S_GRADIENT_COLOR, 0xFFFFFF);
-		obs_data_set_default_int(settings, S_GRADIENT_COLOR2, 0xFFFFFF);
-		obs_data_set_default_int(settings, S_GRADIENT_COLOR3, 0xFFFFFF);
-		obs_data_set_default_int(settings, S_GRADIENT_OPACITY, 100);
 		obs_data_set_default_double(settings, S_GRADIENT_DIR, 90.0);
 		obs_data_set_default_int(settings, S_BKCOLOR, 0x000000);
 		obs_data_set_default_int(settings, S_BKOPACITY, 0);
@@ -1040,6 +1123,7 @@ bool obs_module_load(void)
 		obs_data_set_default_int(settings, S_EXTENTS_CY, 100);
 		obs_data_set_default_bool(settings, S_COLOR_FONTS, true);
 		obs_data_set_default_bool(settings, S_ANTIALIASING, true);
+		obs_data_set_default_bool(settings, S_HARDWARE_ACCELERATION, true);
 
 		obs_data_release(font_obj);
 	};

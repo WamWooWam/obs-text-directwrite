@@ -35,6 +35,8 @@
 #define MAX_SIZE_CX 16384.0
 #define MAX_SIZE_CY 16384.0
 
+#define MAX_GRADIENT_STOPS 16
+
 using namespace Microsoft::WRL;
 
 enum class gradient_mode : uint32_t { none = 0, two_colour = 2, three_colour = 3, four_colour = 4 };
@@ -55,6 +57,11 @@ struct dwrite_run {
 	std::optional<uint32_t> color;
 };
 
+struct gradient_stop {
+	uint32_t color;
+	float offset;
+};
+
 struct obs_dwrite_text_source {
 
 	obs_source_t *source = nullptr;
@@ -63,13 +70,13 @@ struct obs_dwrite_text_source {
 	uint32_t cx = 0;
 	uint32_t cy = 0;
 
-	ComPtr<IDWriteFactory4> pDWriteFactory = nullptr;
+	ComPtr<IDWriteFactory2> pDWriteFactory = nullptr;
 	ComPtr<IDWriteTextFormat> pTextFormat = nullptr;
 	ComPtr<IDWriteTextLayout> pTextLayout = nullptr;
 
-	ComPtr<ID2D1Factory4> pD2DFactory = nullptr;
-	ComPtr<ID2D1Device4> pD2DDevice = nullptr;
-	ComPtr<ID2D1DeviceContext4> pD2DDeviceContext = nullptr;
+	ComPtr<ID2D1Factory1> pD2DFactory = nullptr;
+	ComPtr<ID2D1Device1> pD2DDevice = nullptr;
+	ComPtr<ID2D1DeviceContext1> pD2DDeviceContext = nullptr;
 	ComPtr<ID2D1Brush> pFillBrush = nullptr;
 	ComPtr<ID2D1Brush> pOutlineBrush = nullptr;
 	ComPtr<ID2D1Bitmap1> pTarget = nullptr;
@@ -84,14 +91,13 @@ struct obs_dwrite_text_source {
 	std::wstring text;
 	std::wstring face;
 	int face_size = 0;
-	uint32_t color = 0xFFFFFF;
-	uint32_t color2 = 0xFFFFFF;
-	uint32_t color3 = 0xFFFFFF;
-	uint32_t color4 = 0xFFFFFF;
 
-	gradient_mode gradient_count = gradient_mode::none;
+	bool hardware_acceleration = true;
 
-	float gradient_dir = 0;
+	int32_t gradient_count = 1;
+	gradient_stop gradient_stops[MAX_GRADIENT_STOPS];
+
+	float gradient_angle = 0;
 	float gradient_x = 0;
 	float gradient_y = 0;
 	float gradient2_x = 0;
@@ -165,9 +171,13 @@ struct obs_dwrite_text_source {
 
 	void update_font();
 	void calculate_gradient_axis(float width, float height);
-	void update_brush(ComPtr<ID2D1DeviceContext4> pRT, ID2D1Brush **ppOutlineBrush, ID2D1Brush **ppFillBrush,
+	void update_brush(ComPtr<ID2D1DeviceContext1> pRT, ID2D1Brush **ppOutlineBrush,
+			  ID2D1Brush **ppFillBrush,
 			 float width, float height);
 	void draw_text();
+
+	bool create_render_target_d3d11(SIZE &size);
+
 	void load_file();
 
 	const char *get_string(const char *str);

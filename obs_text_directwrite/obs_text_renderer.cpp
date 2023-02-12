@@ -17,7 +17,6 @@ OBSTextRenderer::OBSTextRenderer(IDWriteFactory2 *pDWriteFactory_, ID2D1Factory 
 	  colorFonts(colorFonts_)
 {
 	pDeviceContext_->CreateSolidColorBrush(D2D1::ColorF(D2D1::ColorF::Black), pTempBrush.GetAddressOf());
-
 	pDWriteFactory_->QueryInterface<IDWriteFactory4>(pDWriteFactory4.ReleaseAndGetAddressOf());
 	pDeviceContext_->QueryInterface<ID2D1DeviceContext4>(pDeviceContext4.ReleaseAndGetAddressOf());
 }
@@ -30,132 +29,98 @@ IFACEMETHODIMP OBSTextRenderer::DrawGlyphRun(__maybenull void *clientDrawingCont
 					     __in DWRITE_GLYPH_RUN_DESCRIPTION const *glyphRunDescription,
 					     IUnknown *clientDrawingEffect)
 {
-	{
-		HRESULT hr = DWRITE_E_NOCOLOR;
-		D2D1_POINT_2F baselineOrigin = D2D1::Point2F(baselineOriginX, baselineOriginY);
+	HRESULT hr = DWRITE_E_NOCOLOR;
+	D2D1_POINT_2F baselineOrigin = D2D1::Point2F(baselineOriginX, baselineOriginY);
 
-		if (pOutlineBrush) {
-			ComPtr<ID2D1PathGeometry> pGeometry;
-			ComPtr<ID2D1GeometrySink> pSink;
-			ComPtr<ID2D1TransformedGeometry> pTransformedGeometry;
-			pD2DFactory->CreatePathGeometry(pGeometry.GetAddressOf());
-			pGeometry->Open(pSink.GetAddressOf());
+	if (pOutlineBrush) {
+		ComPtr<ID2D1PathGeometry> pGeometry;
+		ComPtr<ID2D1GeometrySink> pSink;
+		ComPtr<ID2D1TransformedGeometry> pTransformedGeometry;
+		pD2DFactory->CreatePathGeometry(pGeometry.GetAddressOf());
+		pGeometry->Open(pSink.GetAddressOf());
 
-			glyphRun->fontFace->GetGlyphRunOutline(glyphRun->fontEmSize, glyphRun->glyphIndices,
-							       glyphRun->glyphAdvances, glyphRun->glyphOffsets,
-							       glyphRun->glyphCount, glyphRun->isSideways,
-							       glyphRun->bidiLevel % 2, pSink.Get());
+		glyphRun->fontFace->GetGlyphRunOutline(glyphRun->fontEmSize, glyphRun->glyphIndices,
+						       glyphRun->glyphAdvances, glyphRun->glyphOffsets,
+						       glyphRun->glyphCount, glyphRun->isSideways,
+						       glyphRun->bidiLevel % 2, pSink.Get());
 
-			pSink->Close();
+		pSink->Close();
 
-			D2D1::Matrix3x2F const matrix =
-				D2D1::Matrix3x2F(1.0f, 0.0f, 0.0f, 1.0f, baselineOriginX, baselineOriginY);
+		D2D1::Matrix3x2F const matrix =
+			D2D1::Matrix3x2F(1.0f, 0.0f, 0.0f, 1.0f, baselineOriginX, baselineOriginY);
 
-			pD2DFactory->CreateTransformedGeometry(pGeometry.Get(), &matrix,
-							       pTransformedGeometry.GetAddressOf());
+		pD2DFactory->CreateTransformedGeometry(pGeometry.Get(), &matrix,
+						       pTransformedGeometry.GetAddressOf());
 
-			pDeviceContext->DrawGeometry(pTransformedGeometry.Get(), pOutlineBrush.Get(),
-						     outlineSize);
-		}
+		pDeviceContext->DrawGeometry(pTransformedGeometry.Get(), pOutlineBrush.Get(), outlineSize);
+	}
 
-		// The list of glyph image formats this renderer is prepared to support.
-		DWRITE_GLYPH_IMAGE_FORMATS supportedFormats =
-			DWRITE_GLYPH_IMAGE_FORMATS_TRUETYPE | DWRITE_GLYPH_IMAGE_FORMATS_CFF |
-			DWRITE_GLYPH_IMAGE_FORMATS_COLR | DWRITE_GLYPH_IMAGE_FORMATS_SVG |
-			DWRITE_GLYPH_IMAGE_FORMATS_PNG | DWRITE_GLYPH_IMAGE_FORMATS_JPEG |
-			DWRITE_GLYPH_IMAGE_FORMATS_TIFF | DWRITE_GLYPH_IMAGE_FORMATS_PREMULTIPLIED_B8G8R8A8;
+	// The list of glyph image formats this renderer is prepared to support.
+	DWRITE_GLYPH_IMAGE_FORMATS supportedFormats =
+		DWRITE_GLYPH_IMAGE_FORMATS_TRUETYPE | DWRITE_GLYPH_IMAGE_FORMATS_CFF |
+		DWRITE_GLYPH_IMAGE_FORMATS_COLR | DWRITE_GLYPH_IMAGE_FORMATS_SVG |
+		DWRITE_GLYPH_IMAGE_FORMATS_PNG | DWRITE_GLYPH_IMAGE_FORMATS_JPEG |
+		DWRITE_GLYPH_IMAGE_FORMATS_TIFF | DWRITE_GLYPH_IMAGE_FORMATS_PREMULTIPLIED_B8G8R8A8;
 
-		// Determine whether there are any color glyph runs within glyphRun. If
-		// there are, glyphRunEnumerator can be used to iterate through them.
+	// Determine whether there are any color glyph runs within glyphRun. If
+	// there are, glyphRunEnumerator can be used to iterate through them.
+	ComPtr<IDWriteColorGlyphRunEnumerator> glyphRunEnumerator;
+	ComPtr<IDWriteColorGlyphRunEnumerator1> glyphRunEnumerator1;
+	if (pDWriteFactory4) {
+		hr = pDWriteFactory4->TranslateColorGlyphRun(baselineOrigin, glyphRun, glyphRunDescription,
+							     supportedFormats, measuringMode, nullptr, 0,
+							     glyphRunEnumerator1.GetAddressOf());
+	} else {
+		hr = pDWriteFactory->TranslateColorGlyphRun(baselineOriginX, baselineOriginY, glyphRun,
+							    glyphRunDescription, measuringMode, nullptr, 0,
+							    glyphRunEnumerator.GetAddressOf());
+	}
 
-		ComPtr<IDWriteColorGlyphRunEnumerator> glyphRunEnumerator;
-		ComPtr<IDWriteColorGlyphRunEnumerator1> glyphRunEnumerator1;
-		if (pDWriteFactory4) {
-			hr = pDWriteFactory4->TranslateColorGlyphRun(baselineOrigin, glyphRun,
-								     glyphRunDescription, supportedFormats,
-								     measuringMode, nullptr, 0,
-								     glyphRunEnumerator1.GetAddressOf());
-		} else {
-			hr = pDWriteFactory->TranslateColorGlyphRun(baselineOriginX, baselineOriginY, glyphRun,
-								    glyphRunDescription, measuringMode, nullptr,
-								    0, glyphRunEnumerator.GetAddressOf());
-		}
+	if (hr == DWRITE_E_NOCOLOR || !colorFonts) {
+		// Simple case: the run has no color glyphs. Draw the main glyph run
+		// using the current text color.
+		pDeviceContext->DrawGlyphRun(baselineOrigin, glyphRun, glyphRunDescription, pFillBrush.Get(),
+					     measuringMode);
+	} else {
+		//DX::ThrowIfFailed(hr);
 
-		if (hr == DWRITE_E_NOCOLOR || !colorFonts) {
-			// Simple case: the run has no color glyphs. Draw the main glyph run
-			// using the current text color.
-			pDeviceContext->DrawGlyphRun(baselineOrigin, glyphRun, glyphRunDescription,
-						     pFillBrush.Get(), measuringMode);
-		} else {
-			//DX::ThrowIfFailed(hr);
+		// Complex case: the run has one or more color runs within it. Iterate
+		// over the sub-runs and draw them, depending on their format.
+		for (;;) {
+			BOOL haveRun = FALSE;
 
-			// Complex case: the run has one or more color runs within it. Iterate
-			// over the sub-runs and draw them, depending on their format.
-			for (;;) {
-				BOOL haveRun = FALSE;
+			if (glyphRunEnumerator1) {
+				glyphRunEnumerator1->MoveNext(&haveRun);
+				if (!haveRun)
+					break;
 
-				if (glyphRunEnumerator1) {
-					glyphRunEnumerator1->MoveNext(&haveRun);
-					if (!haveRun)
-						break;
+				const DWRITE_COLOR_GLYPH_RUN1 *colorRun;
+				glyphRunEnumerator1->GetCurrentRun(&colorRun);
+				D2D1_POINT_2F currentBaselineOrigin =
+					D2D1::Point2F(colorRun->baselineOriginX, colorRun->baselineOriginY);
 
-					const DWRITE_COLOR_GLYPH_RUN1 *colorRun;
-					glyphRunEnumerator1->GetCurrentRun(&colorRun);
-					D2D1_POINT_2F currentBaselineOrigin = D2D1::Point2F(
-						colorRun->baselineOriginX, colorRun->baselineOriginY);
-
-					switch (colorRun->glyphImageFormat) {
-					case DWRITE_GLYPH_IMAGE_FORMATS_PNG:
-					case DWRITE_GLYPH_IMAGE_FORMATS_JPEG:
-					case DWRITE_GLYPH_IMAGE_FORMATS_TIFF:
-					case DWRITE_GLYPH_IMAGE_FORMATS_PREMULTIPLIED_B8G8R8A8: {
-						// This run is bitmap glyphs. Use Direct2D to draw them.
-						pDeviceContext4->DrawColorBitmapGlyphRun(
-							colorRun->glyphImageFormat, currentBaselineOrigin,
-							&colorRun->glyphRun, measuringMode);
-					} break;
-
-					case DWRITE_GLYPH_IMAGE_FORMATS_SVG: {
-						// This run is SVG glyphs. Use Direct2D to draw them.
-						pDeviceContext4->DrawSvgGlyphRun(currentBaselineOrigin,
+				switch (colorRun->glyphImageFormat) {
+				case DWRITE_GLYPH_IMAGE_FORMATS_PNG:
+				case DWRITE_GLYPH_IMAGE_FORMATS_JPEG:
+				case DWRITE_GLYPH_IMAGE_FORMATS_TIFF:
+				case DWRITE_GLYPH_IMAGE_FORMATS_PREMULTIPLIED_B8G8R8A8: {
+					// This run is bitmap glyphs. Use Direct2D to draw them.
+					pDeviceContext4->DrawColorBitmapGlyphRun(colorRun->glyphImageFormat,
+										 currentBaselineOrigin,
 										 &colorRun->glyphRun,
-										 pFillBrush.Get(),
-										 nullptr, // svgGlyphStyle
-										 0,       // colorPaletteIndex
 										 measuringMode);
-					} break;
+				} break;
 
-					default: {
+				case DWRITE_GLYPH_IMAGE_FORMATS_SVG: {
+					// This run is SVG glyphs. Use Direct2D to draw them.
+					pDeviceContext4->DrawSvgGlyphRun(currentBaselineOrigin,
+									 &colorRun->glyphRun, pFillBrush.Get(),
+									 nullptr, // svgGlyphStyle
+									 0,       // colorPaletteIndex
+									 measuringMode);
+				} break;
 
-						// This run is solid-color outlines, either from non-color
-						// glyphs or from COLR glyph layers. Use Direct2D to draw them.
-						ComPtr<ID2D1Brush> layerBrush;
-						if (colorRun->paletteIndex == 0xFFFF) {
-							// This run uses the current text color.
-							layerBrush = pFillBrush;
-						} else {
-							// This run specifies its own color.
-							pTempBrush->SetColor(colorRun->runColor);
-							layerBrush = pTempBrush;
-						}
-
-						// Draw the run with the selected color.
-						pDeviceContext->DrawGlyphRun(currentBaselineOrigin,
-									     &colorRun->glyphRun,
-									     colorRun->glyphRunDescription,
-									     layerBrush.Get(), measuringMode);
-					} break;
-					}
-				} else {
-					glyphRunEnumerator->MoveNext(&haveRun);
-					if (!haveRun)
-						break;
-
-					const DWRITE_COLOR_GLYPH_RUN *colorRun;
-					glyphRunEnumerator->GetCurrentRun(&colorRun);
-					D2D1_POINT_2F currentBaselineOrigin = D2D1::Point2F(
-						colorRun->baselineOriginX, colorRun->baselineOriginY);
-
+				default: {
 					// This run is solid-color outlines, either from non-color
 					// glyphs or from COLR glyph layers. Use Direct2D to draw them.
 					ComPtr<ID2D1Brush> layerBrush;
@@ -172,12 +137,39 @@ IFACEMETHODIMP OBSTextRenderer::DrawGlyphRun(__maybenull void *clientDrawingCont
 					pDeviceContext->DrawGlyphRun(currentBaselineOrigin, &colorRun->glyphRun,
 								     colorRun->glyphRunDescription,
 								     layerBrush.Get(), measuringMode);
+				} break;
 				}
+			} else {
+				glyphRunEnumerator->MoveNext(&haveRun);
+				if (!haveRun)
+					break;
+
+				const DWRITE_COLOR_GLYPH_RUN *colorRun;
+				glyphRunEnumerator->GetCurrentRun(&colorRun);
+				D2D1_POINT_2F currentBaselineOrigin =
+					D2D1::Point2F(colorRun->baselineOriginX, colorRun->baselineOriginY);
+
+				// This run is solid-color outlines, either from non-color
+				// glyphs or from COLR glyph layers. Use Direct2D to draw them.
+				ComPtr<ID2D1Brush> layerBrush;
+				if (colorRun->paletteIndex == 0xFFFF) {
+					// This run uses the current text color.
+					layerBrush = pFillBrush;
+				} else {
+					// This run specifies its own color.
+					pTempBrush->SetColor(colorRun->runColor);
+					layerBrush = pTempBrush;
+				}
+
+				// Draw the run with the selected color.
+				pDeviceContext->DrawGlyphRun(currentBaselineOrigin, &colorRun->glyphRun,
+							     colorRun->glyphRunDescription, layerBrush.Get(),
+							     measuringMode);
 			}
 		}
-
-		return hr;
 	}
+
+	return hr;
 }
 
 IFACEMETHODIMP

@@ -10,8 +10,7 @@ using namespace Microsoft::WRL;
 class OBSTextRenderer : public IDWriteTextRenderer {
 public:
 	OBSTextRenderer(IDWriteFactory2 *pDWriteFactory_, ID2D1Factory *pD2DFactory, ID2D1DeviceContext1 *pRT,
-			  ID2D1Brush *pOutlineBrush, ID2D1Brush *pFillBrush, float outlineSize,
-			  bool colorFonts);
+			ID2D1Brush *pOutlineBrush, ID2D1Brush *pFillBrush, float outlineSize, bool colorFonts);
 
 	~OBSTextRenderer();
 

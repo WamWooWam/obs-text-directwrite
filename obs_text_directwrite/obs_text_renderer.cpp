@@ -33,9 +33,9 @@ IFACEMETHODIMP OBSTextRenderer::DrawGlyphRun(__maybenull void *clientDrawingCont
 	D2D1_POINT_2F baselineOrigin = D2D1::Point2F(baselineOriginX, baselineOriginY);
 
 	if (pOutlineBrush) {
-		ComPtr<ID2D1PathGeometry> pGeometry;
-		ComPtr<ID2D1GeometrySink> pSink;
-		ComPtr<ID2D1TransformedGeometry> pTransformedGeometry;
+		ComPtr<ID2D1PathGeometry> pGeometry{};
+		ComPtr<ID2D1GeometrySink> pSink{};
+		ComPtr<ID2D1TransformedGeometry> pTransformedGeometry{};
 		pD2DFactory->CreatePathGeometry(pGeometry.GetAddressOf());
 		pGeometry->Open(pSink.GetAddressOf());
 
@@ -64,8 +64,8 @@ IFACEMETHODIMP OBSTextRenderer::DrawGlyphRun(__maybenull void *clientDrawingCont
 
 	// Determine whether there are any color glyph runs within glyphRun. If
 	// there are, glyphRunEnumerator can be used to iterate through them.
-	ComPtr<IDWriteColorGlyphRunEnumerator> glyphRunEnumerator;
-	ComPtr<IDWriteColorGlyphRunEnumerator1> glyphRunEnumerator1;
+	ComPtr<IDWriteColorGlyphRunEnumerator> glyphRunEnumerator{};
+	ComPtr<IDWriteColorGlyphRunEnumerator1> glyphRunEnumerator1{};
 	if (pDWriteFactory4) {
 		hr = pDWriteFactory4->TranslateColorGlyphRun(baselineOrigin, glyphRun, glyphRunDescription,
 							     supportedFormats, measuringMode, nullptr, 0,
@@ -82,8 +82,6 @@ IFACEMETHODIMP OBSTextRenderer::DrawGlyphRun(__maybenull void *clientDrawingCont
 		pDeviceContext->DrawGlyphRun(baselineOrigin, glyphRun, glyphRunDescription, pFillBrush.Get(),
 					     measuringMode);
 	} else {
-		//DX::ThrowIfFailed(hr);
-
 		// Complex case: the run has one or more color runs within it. Iterate
 		// over the sub-runs and draw them, depending on their format.
 		for (;;) {
@@ -239,8 +237,6 @@ IFACEMETHODIMP OBSTextRenderer::DrawInlineObject(__maybenull void *clientDrawing
 						 BOOL isSideways, BOOL isRightToLeft,
 						 IUnknown *clientDrawingEffect)
 {
-	//return E_NOTIMPL;
-
 	return inlineObject->Draw(clientDrawingContext, this, originX, originY, isSideways, isRightToLeft,
 				  clientDrawingEffect);
 }

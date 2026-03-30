@@ -699,6 +699,13 @@ void obs_dwrite_text_source::draw_text()
 		pTextLayout->SetStrikethrough(strikeout, text_range);
 		pTextLayout->SetWordWrapping(wrap);
 
+		auto pFactory = this->pDWriteFactory.as<IDWriteFactory>();
+		winrt::com_ptr<IDWriteTypography> pTypography;
+		pDWriteFactory->CreateTypography(pTypography.put());
+
+		pTypography->AddFontFeature(DWRITE_FONT_FEATURE{DWRITE_FONT_FEATURE_TAG_TABULAR_FIGURES, 1u});
+		pTextLayout->SetTypography(pTypography.get(), text_range);
+
 		for (auto&& run : runs) {
 			DWRITE_TEXT_RANGE run_range = { run.start, run.length };
 

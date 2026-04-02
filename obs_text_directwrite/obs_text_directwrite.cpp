@@ -130,6 +130,8 @@
 #define S_FONT_UNDERLINE "underline"
 #define S_FONT_STRIKETHROUGH "strikethrough"
 
+#define S_TABULAR_FIGURES "tabular_figures"
+
 #define S_ADVANCED "advanced"
 
 #define S_HAS_VARIABLES "has_variables"
@@ -248,6 +250,8 @@
 
 #define T_FONT_UNDERLINE		T_("Font.Underline")
 #define T_FONT_STRIKETHROUGH	T_("Font.Strikethrough")
+
+#define T_TABULAR_FIGURES		T_("FontFeature.TabularFigures")
 
 #define T_HTML T_("Html")
 
@@ -584,7 +588,7 @@ bool obs_dwrite_text_source::create_text_layout(
 				value.value = weight_value;
 				has_weight = true;
 			}
-			
+
 			if (value.axisTag == DWRITE_FONT_AXIS_TAG_WIDTH) {
 				value.value = stretch_value;
 				has_stretch = true;
@@ -771,6 +775,14 @@ void obs_dwrite_text_source::draw_text()
 	pTextLayout->SetUnderline(underline, text_range);
 	pTextLayout->SetStrikethrough(strikeout, text_range);
 	pTextLayout->SetWordWrapping(wrap);
+
+	if (tabular_figures) {
+		winrt::com_ptr<IDWriteTypography> pTypography;
+		pDWriteFactory->CreateTypography(pTypography.put());
+
+		pTypography->AddFontFeature(DWRITE_FONT_FEATURE{ DWRITE_FONT_FEATURE_TAG_TABULAR_FIGURES, 1u });
+		pTextLayout->SetTypography(pTypography.get(), text_range);
+	}
 
 	for (auto&& run : runs) {
 		DWRITE_TEXT_RANGE run_range = { run.start, run.length };
@@ -1022,6 +1034,8 @@ inline void obs_dwrite_text_source::Update(obs_data_t* s)
 	int32_t new_line_spacing = obs_data_get_int32(s, S_LINE_SPACING);
 	float new_line_spacing_ratio = (float)obs_data_get_double(s, S_LINE_SPACING_RATIO);
 
+	bool new_tabular_figures = obs_data_get_bool(s, S_TABULAR_FIGURES);
+
 	std::vector<DWRITE_FONT_AXIS_VALUE> axis{};
 
 	obs_data_item_t* item = obs_data_first(s);
@@ -1141,6 +1155,8 @@ inline void obs_dwrite_text_source::Update(obs_data_t* s)
 		wrap = DWRITE_WORD_WRAPPING_WRAP;
 	else if (strcmp(wrap_str, S_WRAP_MODE_NONE) == 0)
 		wrap = DWRITE_WORD_WRAPPING_NO_WRAP;
+
+	tabular_figures = new_tabular_figures;
 
 	draw_text();
 	update_time_elapsed = 0.0f;
@@ -1711,6 +1727,7 @@ static obs_properties_t* get_properties(void* data)
 
 	obs_properties_add_bool(font_group, S_FONT_UNDERLINE, T_FONT_UNDERLINE);
 	obs_properties_add_bool(font_group, S_FONT_STRIKETHROUGH, T_FONT_STRIKETHROUGH);
+	obs_properties_add_bool(font_group, S_TABULAR_FIGURES, T_TABULAR_FIGURES);
 
 	obs_properties_t* variable_group = obs_properties_create();
 	p = obs_properties_add_group(props, S_VARIABLE, T_VARIABLE, OBS_GROUP_NORMAL, variable_group);

@@ -167,6 +167,10 @@ private:
 	bool strikeout = false;
 	bool color_fonts = true;
 	bool antialias = true;
+
+	// TODO: all font features :)
+	bool tabular_figures = false;
+
 	//bool vertical = false;
 
 public:

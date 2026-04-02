@@ -49,6 +49,10 @@
 #define S_OUTLINE_COLOR "outline_color"
 #define S_OUTLINE_OPACITY "outline_opacity"
 
+#define S_FONT_FEATURES "font_features"
+#define S_FONT_FEATURES_GROUP "font_features_group"
+#define S_FONT_FEATURES_TABULAR_NUMS "font_features_tabular_nums"
+
 #define S_CHATLOG_MODE "chatlog"
 #define S_CHATLOG_LINES "chatlog_lines"
 
@@ -168,6 +172,9 @@
 #define T_OUTLINE_SIZE		T_("Outline.Size")
 #define T_OUTLINE_COLOR		T_("Outline.Color")
 #define T_OUTLINE_OPACITY	T_("Outline.Opacity")
+
+#define T_FONT_FEATURES		T_("FontFeatures")
+#define T_FONT_FEATURES_TABULAR_NUMS	T_("FontFeatures.TabularNums")
 
 #define T_CHATLOG_MODE		T_("ChatlogMode")
 #define T_CHATLOG_LINES		T_("ChatlogMode.Lines")
@@ -699,12 +706,15 @@ void obs_dwrite_text_source::draw_text()
 		pTextLayout->SetStrikethrough(strikeout, text_range);
 		pTextLayout->SetWordWrapping(wrap);
 
-		auto pFactory = this->pDWriteFactory.as<IDWriteFactory>();
-		winrt::com_ptr<IDWriteTypography> pTypography;
-		pDWriteFactory->CreateTypography(pTypography.put());
+		if (this->tabular_nums) {
+			auto pFactory = this->pDWriteFactory.as<IDWriteFactory>();
+			winrt::com_ptr<IDWriteTypography> pTypography;
+			pDWriteFactory->CreateTypography(pTypography.put());
 
-		pTypography->AddFontFeature(DWRITE_FONT_FEATURE{DWRITE_FONT_FEATURE_TAG_TABULAR_FIGURES, 1u});
-		pTextLayout->SetTypography(pTypography.get(), text_range);
+			pTypography->AddFontFeature(
+				DWRITE_FONT_FEATURE{DWRITE_FONT_FEATURE_TAG_TABULAR_FIGURES, 1u});
+			pTextLayout->SetTypography(pTypography.get(), text_range);
+		}
 
 		for (auto&& run : runs) {
 			DWRITE_TEXT_RANGE run_range = { run.start, run.length };
@@ -953,6 +963,8 @@ inline void obs_dwrite_text_source::Update(obs_data_t* s)
 	uint32_t new_shadow_color = obs_data_get_uint32(s, S_SHADOW_COLOR);
 	uint32_t new_shadow_opacity = obs_data_get_uint32(s, S_SHADOW_OPACITY);
 
+	bool new_tabular_nums = obs_data_get_bool(s, S_FONT_FEATURES_TABULAR_NUMS);
+
 	int32_t new_line_spacing = obs_data_get_int32(s, S_LINE_SPACING);
 	float new_line_spacing_ratio = (float)obs_data_get_double(s, S_LINE_SPACING_RATIO);
 
@@ -1050,6 +1062,8 @@ inline void obs_dwrite_text_source::Update(obs_data_t* s)
 	shadow_offset_y = new_shadow_offset_y;
 	shadow_radius = new_shadow_radius;
 	shadow_opacity = new_shadow_opacity;
+
+	tabular_nums = new_tabular_nums;
 
 	if (strcmp(align_str, S_ALIGN_CENTER) == 0)
 		align = DWRITE_TEXT_ALIGNMENT_CENTER;
@@ -1748,6 +1762,13 @@ static obs_properties_t* get_properties(void* data)
 	obs_properties_add_color(outline_group, S_OUTLINE_COLOR, T_OUTLINE_COLOR);
 	obs_properties_add_int_slider(outline_group, S_OUTLINE_OPACITY, T_OUTLINE_OPACITY, 0, 100, 1);
 
+	// font features group
+	obs_properties_t *features_group = obs_properties_create();
+	obs_properties_add_group(props, S_FONT_FEATURES_GROUP, T_FONT_FEATURES, OBS_GROUP_NORMAL,
+				 features_group);
+
+	obs_properties_add_bool(features_group, S_FONT_FEATURES_TABULAR_NUMS, T_FONT_FEATURES_TABULAR_NUMS);
+
 	// advanced group
 	obs_properties_t* advanced_group = obs_properties_create();
 	obs_properties_add_group(props, S_ADVANCED, T_ADVANCED, OBS_GROUP_NORMAL, advanced_group);
@@ -1810,6 +1831,7 @@ bool obs_module_load(void)
 		obs_data_set_default_int(settings, S_EXTENTS_CY, 100);
 		obs_data_set_default_bool(settings, S_COLOR_FONTS, true);
 		obs_data_set_default_bool(settings, S_ANTIALIASING, true);
+		obs_data_set_default_bool(settings, S_FONT_FEATURES_TABULAR_NUMS, false);
 
 		//obs_data_release(font_obj);
 		};

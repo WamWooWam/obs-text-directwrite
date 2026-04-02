@@ -159,6 +159,9 @@ private:
 	bool antialias = true;
 	//bool vertical = false;
 
+	// Font features
+	bool tabular_nums = false;
+
 public:
 	bool has_variables = false;
 private:

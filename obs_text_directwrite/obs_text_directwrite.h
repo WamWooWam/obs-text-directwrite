@@ -1,4 +1,5 @@
 #pragma once
+
 #include <util/platform.h>
 #include <util/util.hpp>
 #include <obs-module.h>
@@ -15,8 +16,6 @@
 #include <d3d11.h>
 #include <dwrite.h>
 #include <d2d1.h>
-#include <d3d11.h>
-#include <d2d1_3.h>
 #include <dwrite_3.h>
 #include <d2d1effects.h>
 #include <wrl.h>
@@ -35,9 +34,9 @@
 
 #ifndef clamp_assign
 #define clamp_assign(val, min_val, max_val) \
-	if (val < min_val)                  \
-		val = min_val;              \
-	else if (val > max_val)             \
+	if (val < min_val)						\
+		val = min_val;						\
+	else if (val > max_val)					\
 		val = max_val;
 #endif
 
@@ -50,7 +49,7 @@
 
 using namespace Microsoft::WRL;
 
-enum class format_flags {
+enum class format_flags : int {
 	none,
 	bold,
 	italic,
@@ -92,9 +91,20 @@ struct usize_t {
 	inline bool operator!=(const usize_t& other) { return !(*this == other); }
 };
 
+struct obs_graphics_t {
+	inline obs_graphics_t() {
+		obs_enter_graphics();
+	}
+
+	inline ~obs_graphics_t() {
+		obs_leave_graphics();
+	}
+};
+
 struct obs_dwrite_text_source {
-private:
+public:
 	obs_source_t* source = nullptr;
+private:
 
 	gs_texture_t* textTexture = nullptr;
 	gs_texture_t* targetTexture = nullptr;
@@ -194,7 +204,7 @@ private:
 public:
 	inline obs_dwrite_text_source(obs_source_t* source_, obs_data_t* settings) : source(source_)
 	{
-		obs_enter_graphics();
+		obs_graphics_t gs;
 
 		try {
 			init_dwrite();
@@ -204,23 +214,24 @@ public:
 				to_string(e.message()).c_str());
 		}
 
-		obs_leave_graphics();
-
 		obs_source_update(source, settings);
 	}
 
 	inline ~obs_dwrite_text_source()
 	{
+		obs_graphics_t gs;
+
+		pTarget = nullptr;
+		pTextTarget = nullptr;
+
 		if (targetTexture) {
-			obs_enter_graphics();
 			gs_texture_destroy(targetTexture);
-			obs_leave_graphics();
+			targetTexture = nullptr;
 		}
 
 		if (textTexture) {
-			obs_enter_graphics();
 			gs_texture_destroy(textTexture);
-			obs_leave_graphics();
+			textTexture = nullptr;
 		}
 
 		release();
@@ -242,7 +253,7 @@ public:
 				(float)MIN_SIZE_CY, (float)MAX_SIZE_CY);
 	}
 
-	private:
+private:
 	gradient_axis_t calculate_gradient_axis(float width, float height) const;
 
 	void init_dwrite();

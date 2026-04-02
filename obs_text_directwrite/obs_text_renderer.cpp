@@ -40,19 +40,41 @@ IFACEMETHODIMP OBSTextRenderer::DrawGlyphRun(__maybenull void *clientDrawingCont
 		pGeometry->Open(pSink.GetAddressOf());
 
 		glyphRun->fontFace->GetGlyphRunOutline(glyphRun->fontEmSize, glyphRun->glyphIndices,
-						       glyphRun->glyphAdvances, glyphRun->glyphOffsets,
-						       glyphRun->glyphCount, glyphRun->isSideways,
-						       glyphRun->bidiLevel % 2, pSink.Get());
+								glyphRun->glyphAdvances, glyphRun->glyphOffsets,
+								glyphRun->glyphCount, glyphRun->isSideways,
+								glyphRun->bidiLevel % 2, pSink.Get());
 
 		pSink->Close();
 
 		D2D1::Matrix3x2F const matrix =
 			D2D1::Matrix3x2F(1.0f, 0.0f, 0.0f, 1.0f, baselineOriginX, baselineOriginY);
 
-		pD2DFactory->CreateTransformedGeometry(pGeometry.Get(), &matrix,
-						       pTransformedGeometry.GetAddressOf());
+		ComPtr<ID2D1PathGeometry> pWidenedGeometry{};
+		ComPtr<ID2D1GeometrySink> pWidenedSink{};
+		pD2DFactory->CreatePathGeometry(pWidenedGeometry.GetAddressOf());
+		pWidenedGeometry->Open(pWidenedSink.GetAddressOf());
+		pGeometry->Widen(outlineSize, nullptr, &matrix, pWidenedSink.Get());
+		pWidenedSink->Close();
 
-		pDeviceContext->DrawGeometry(pTransformedGeometry.Get(), pOutlineBrush.Get(), outlineSize);
+		pDeviceContext->FillGeometry(pWidenedGeometry.Get(), pOutlineBrush.Get());
+	}
+
+
+	ComPtr<ID2D1DeviceContext7> pContext7;
+	if (SUCCEEDED(pDeviceContext.As<ID2D1DeviceContext7>(&pContext7)))
+	{
+		// Note: Direct2D drawing methods return void. If a drawing
+		// operation fails, then an error is returned by EndDraw.
+		pContext7->DrawGlyphRunWithColorSupport(
+			baselineOrigin,
+			glyphRun,
+			/*glyphRunDescription*/ NULL,
+			pFillBrush.Get(),
+			/*svgGlyphStyle*/ NULL,
+			/*colorPaletteIndex*/ 0,
+			measuringMode
+		);
+		return S_OK;
 	}
 
 	// The list of glyph image formats this renderer is prepared to support.
@@ -251,7 +273,7 @@ IFACEMETHODIMP OBSTextRenderer::IsPixelSnappingDisabled(__maybenull void *client
 IFACEMETHODIMP
 OBSTextRenderer::GetCurrentTransform(__maybenull void *clientDrawingContext, __out DWRITE_MATRIX *transform)
 {
-	//forward the render target's transform
+	// forward the render target's transform
 	pDeviceContext->GetTransform(reinterpret_cast<D2D1_MATRIX_3X2_F *>(transform));
 	return S_OK;
 }

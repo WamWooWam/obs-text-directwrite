@@ -246,23 +246,32 @@
 #define T_LINE_SPACING_UNIFORM	T_("LineSpacing.Uniform")
 #define T_LINE_SPACING_RATIO	T_("LineSpacing.Ratio")
 
+#define T_FONT_UNDERLINE		T_("Font.Underline")
+#define T_FONT_STRIKETHROUGH	T_("Font.Strikethrough")
+
 #define T_HTML T_("Html")
 
 #define T_ADVANCED T_("Advanced")
 
-static char gradient_stop_color_names[MAX_GRADIENT_STOPS][32]{
+static const char gradient_stop_color_names[MAX_GRADIENT_STOPS][32]{
 	"gradient_color_0",  "gradient_color_1",  "gradient_color_2",  "gradient_color_3",
 	"gradient_color_4",  "gradient_color_5",  "gradient_color_6",  "gradient_color_7",
 	"gradient_color_8",  "gradient_color_9",  "gradient_color_10", "gradient_color_11",
 	"gradient_color_12", "gradient_color_13", "gradient_color_14", "gradient_color_15",
 };
 
-//static char *gradient_stop_offset_names[MAX_GRADIENT_STOPS][32]{
-//	"gradient_offset_0",  "gradient_offset_0",  "gradient_offset_0",  "gradient_offset_0",
-//	"gradient_offset_0",  "gradient_offset_0",  "gradient_offset_0",  "gradient_offset_0",
-//	"gradient_offset_0",  "gradient_offset_0",  "gradient_offset_0", "gradient_offset_0",
-//	"gradient_offset_0", "gradient_offset_0", "gradient_offset_0", "gradient_offset_0",
-//};
+static const float stretchToWidth[] = {
+	0.0f,    // undefined (0)
+	50.0f,   // ultra-condensed
+	62.5f,   // extra-condensed
+	75.0f,   // condensed
+	87.5f,   // semi-condensed
+	100.0f,  // normal
+	112.5f,  // semi-expanded
+	125.0f,  // expanded
+	150.0f,  // extra-expanded
+	200.0f,  // ultra-expanded
+};
 
 static void upgrade_properties(void* data, obs_data_t* settings);
 
@@ -305,14 +314,20 @@ static time_t get_modified_timestamp(const char* filename)
 
 void obs_dwrite_text_source::init_dwrite()
 {
+	obs_graphics_t gs;
+
 	if (gs_get_device_type() != GS_DEVICE_DIRECT3D_11) {
 		error("Unsupported render backend! Are you using OpenGL?");
 		throw winrt::hresult_error(CO_E_NOT_SUPPORTED);
 	}
 
-	winrt::check_hresult(D2D1CreateFactory(D2D1_FACTORY_TYPE_SINGLE_THREADED, pD2DFactory.put()));
-	winrt::com_ptr<ID3D11Device> device((ID3D11Device*)gs_get_device_obj(),
-		winrt::take_ownership_from_abi);
+	winrt::check_hresult(D2D1CreateFactory(D2D1_FACTORY_TYPE_MULTI_THREADED, pD2DFactory.put()));
+
+	// manually AddRef, OBS does not do this for us :)
+	auto d3dDevice = reinterpret_cast<ID3D11Device*>(gs_get_device_obj());
+	d3dDevice->AddRef();
+
+	winrt::com_ptr<ID3D11Device> device(d3dDevice, winrt::take_ownership_from_abi);
 
 	if (device == nullptr)
 		throw winrt::hresult_error(E_UNEXPECTED);
@@ -323,7 +338,7 @@ void obs_dwrite_text_source::init_dwrite()
 
 	pD2DDevice = d2dDevice.as<ID2D1Device1>();
 	winrt::check_hresult(
-		pD2DDevice->CreateDeviceContext(D2D1_DEVICE_CONTEXT_OPTIONS_NONE, pD2DContext.put()));
+		pD2DDevice->CreateDeviceContext(D2D1_DEVICE_CONTEXT_OPTIONS_ENABLE_MULTITHREADED_OPTIMIZATIONS, pD2DContext.put()));
 
 	winrt::check_hresult(DWriteCreateFactory(DWRITE_FACTORY_TYPE_SHARED, __uuidof(IDWriteFactory2),
 		reinterpret_cast<IUnknown**>(pDWriteFactory.put())));
@@ -371,6 +386,8 @@ gradient_axis_t obs_dwrite_text_source::calculate_gradient_axis(float width, flo
 
 bool obs_dwrite_text_source::create_render_target_d3d11(usize_t& size, thickness_t& padding)
 {
+	obs_graphics_t gs;
+
 	pD2DContext->SetTarget(nullptr);
 	pTarget = nullptr;
 	pTextTarget = nullptr;
@@ -432,6 +449,8 @@ bool obs_dwrite_text_source::create_render_target_d3d11(usize_t& size, thickness
 
 void obs_dwrite_text_source::update_brush(float width, float height)
 {
+	obs_graphics_t gr;
+
 	HRESULT hr;
 
 	pFillBrush = nullptr;
@@ -473,6 +492,8 @@ void obs_dwrite_text_source::update_brush(float width, float height)
 
 void obs_dwrite_text_source::update_effects()
 {
+	obs_graphics_t gr;
+
 	pEffect = nullptr;
 
 	if (use_shadow) {
@@ -507,53 +528,120 @@ bool obs_dwrite_text_source::create_text_layout(
 	float layout_cx,
 	float layout_cy)
 {
-	WCHAR localeName[LOCALE_NAME_MAX_LENGTH] = L"en-us";
+	obs_graphics_t gr;
+
+	std::wstring obs_locale = to_wide(obs_get_locale());
 
 	try {
-		auto pFactory7 = this->pDWriteFactory.as<IDWriteFactory7>();
-		auto fontCollection2 = this->pSystemFontCollection.try_as<IDWriteFontCollection2>();
+
+		winrt::com_ptr<IDWriteFactory6> pFactory6
+			= this->pDWriteFactory.as<IDWriteFactory6>();
+
+		winrt::com_ptr<IDWriteFontCollection> systemFontCollection;
+		pFactory6->GetSystemFontCollection(systemFontCollection.put());
+
+		winrt::com_ptr<IDWriteFontCollection2> fontCollection2
+			= systemFontCollection.as<IDWriteFontCollection2>();
 
 		std::vector<DWRITE_FONT_AXIS_VALUE> axisValues = { variables };
 
-		winrt::com_ptr<IDWriteFontSet2> fontSet2;
-		winrt::check_hresult(pFactory7->GetSystemFontSet(false, fontSet2.put()));
-		winrt::com_ptr<IDWriteFontSet4> fontSet;
-		winrt::check_hresult(fontSet2->QueryInterface(fontSet.put()));
+		winrt::com_ptr<IDWriteFontSet1> fontSet1;
+		winrt::check_hresult(pFactory6->GetSystemFontSet(false, fontSet1.put()));
 
-		DWRITE_FONT_SIMULATIONS allowedSimulations = DWRITE_FONT_SIMULATIONS_OBLIQUE;
+		winrt::com_ptr<IDWriteFontSet4> fontSet = fontSet1.try_as<IDWriteFontSet4>();
+		if (fontSet) {
+			size_t const inputAxisCount = axisValues.size();
+			if (inputAxisCount > UINT32_MAX - DWRITE_STANDARD_FONT_AXIS_COUNT)
+				winrt::check_hresult(E_INVALIDARG);
 
-		size_t const inputAxisCount = axisValues.size();
-		if (inputAxisCount > UINT32_MAX - DWRITE_STANDARD_FONT_AXIS_COUNT)
-			winrt::check_hresult(E_INVALIDARG);
+			axisValues.resize(inputAxisCount + DWRITE_STANDARD_FONT_AXIS_COUNT);
 
-		axisValues.resize(inputAxisCount + DWRITE_STANDARD_FONT_AXIS_COUNT);
+			UINT32 derivedAxisCount = fontSet->ConvertWeightStretchStyleToFontAxisValues(
+				axisValues.data(),
+				static_cast<UINT32>(inputAxisCount),
+				(DWRITE_FONT_WEIGHT)weight,
+				(DWRITE_FONT_STRETCH)stretch,
+				style,
+				(float)face_size / 96.0f * 72.0f,
+				axisValues.data() + inputAxisCount
+			);
 
-		UINT32 derivedAxisCount = fontSet->ConvertWeightStretchStyleToFontAxisValues(
-			axisValues.data(),
-			static_cast<UINT32>(inputAxisCount),
-			(DWRITE_FONT_WEIGHT)weight,
-			(DWRITE_FONT_STRETCH)stretch,
-			style,
-			(float)face_size / 96.0f * 72.0f,
-			axisValues.data() + inputAxisCount
-		);
+			axisValues.resize(inputAxisCount + derivedAxisCount);
+		}
+		else {
+			// TODO: shim for ConvertWeightStretchStyleToFontAxisValues
+		}
 
-		axisValues.resize(inputAxisCount + derivedAxisCount);
+		float weight_value = weight;
+		float stretch_value = has_variables ? stretch : stretchToWidth[(int)stretch];
+		float slant_value = style == DWRITE_FONT_STYLE_NORMAL ? 0 :
+			style == DWRITE_FONT_STYLE_ITALIC ? -5 :
+			-10;
 
-		winrt::com_ptr<IDWriteFontSet4> matchingFonts;
-		winrt::check_hresult(fontSet->GetMatchingFonts(
-			font_face.c_str(),
-			axisValues.data(),
-			static_cast<UINT32>(axisValues.size()),
-			allowedSimulations,
-			matchingFonts.put()
-		));
+		bool has_weight = false, has_stretch = false, has_slant = false, has_italic = false;
+		for (auto& value : axisValues) {
+			if (value.axisTag == DWRITE_FONT_AXIS_TAG_WEIGHT) {
+				value.value = weight_value;
+				has_weight = true;
+			}
+			
+			if (value.axisTag == DWRITE_FONT_AXIS_TAG_WIDTH) {
+				value.value = stretch_value;
+				has_stretch = true;
+			}
+
+			if (value.axisTag == DWRITE_FONT_AXIS_TAG_SLANT) {
+				has_slant = true;
+			}
+
+			if (value.axisTag == DWRITE_FONT_AXIS_TAG_ITALIC) {
+				has_italic = true;
+			}
+		}
+
+		if (!has_weight) {
+			axisValues.push_back({
+				DWRITE_FONT_AXIS_TAG_WEIGHT,
+				weight_value
+				});
+		}
+
+		if (!has_stretch) {
+			axisValues.push_back({
+				DWRITE_FONT_AXIS_TAG_WIDTH,
+				stretch_value
+				});
+		}
+
+		if (style != DWRITE_FONT_STYLE_NORMAL) {
+			if (!has_slant && !has_italic) {
+				if (style == DWRITE_FONT_STYLE_ITALIC) {
+					axisValues.push_back({
+						DWRITE_FONT_AXIS_TAG_ITALIC,
+						1.0f
+						});
+				}
+
+				axisValues.push_back({
+					DWRITE_FONT_AXIS_TAG_SLANT,
+					slant_value
+					});
+			}
+		}
 
 		if (!has_variables) {
-			winrt::com_ptr<IDWriteFontFaceReference1> faceRef;
+			winrt::com_ptr<IDWriteFontList2> matchingFonts;
+			winrt::check_hresult(fontCollection2->GetMatchingFonts(
+				font_face.c_str(),
+				axisValues.data(),
+				static_cast<UINT32>(axisValues.size()),
+				matchingFonts.put()
+			));
+
+			winrt::com_ptr<IDWriteFontFaceReference> faceRef;
 			winrt::check_hresult(matchingFonts->GetFontFaceReference(0, faceRef.put()));
 
-			winrt::com_ptr<IDWriteFontFace5> fontFace;
+			winrt::com_ptr<IDWriteFontFace3> fontFace;
 			winrt::check_hresult(faceRef->CreateFontFace(fontFace.put()));
 
 			winrt::com_ptr<IDWriteLocalizedStrings> pFamilyNames;
@@ -565,12 +653,7 @@ bool obs_dwrite_text_source::create_text_layout(
 			UINT32 length = 0;
 			HRESULT hr = S_OK;
 			BOOL exists = false;
-			if (SUCCEEDED(hr = pFamilyNames->FindLocaleName(localeName, &index, &exists)) && exists) {
-				pFamilyNames->GetStringLength(index, &length);
-				name.resize(length);
-				pFamilyNames->GetString(index, name.data(), length + 1);
-			}
-			else if (SUCCEEDED(hr = pFamilyNames->FindLocaleName(L"en-us", &index, &exists)) && exists) {
+			if (SUCCEEDED(hr = pFamilyNames->FindLocaleName(L"en-us", &index, &exists)) && exists) {
 				pFamilyNames->GetStringLength(index, &length);
 				name.resize(length);
 				pFamilyNames->GetString(index, name.data(), length + 1);
@@ -578,27 +661,15 @@ bool obs_dwrite_text_source::create_text_layout(
 
 			font_face = name;
 		}
-		else
-		{
-			bool has_weight = false, has_stretch = false;
-			for (auto& value : axisValues) {
-				if (value.axisTag == DWRITE_FONT_AXIS_TAG_WEIGHT) {
-					value.value = weight;
-					has_weight = true;
-				}
-				if (value.axisTag == DWRITE_FONT_AXIS_TAG_WIDTH) {
-					value.value = stretch;
-					has_weight = true;
-				}
-			}
-		}
+
+		info("Creating text layout (modern) with font: %s, size %.2f", winrt::to_string(font_face).c_str(), (float)face_size / 96.0f * 72.0f);
 
 		winrt::com_ptr<IDWriteTextFormat3> pTextFormat3;
-		winrt::check_hresult(pFactory7->CreateTextFormat(
+		winrt::check_hresult(pFactory6->CreateTextFormat(
 			font_face.c_str(), NULL, axisValues.data(), axisValues.size(), (float)face_size / 96.0f * 72.0f,
-			localeName, pTextFormat3.put()));
+			obs_locale.c_str(), pTextFormat3.put()));
 
-		winrt::check_hresult(pFactory7->CreateTextLayout(text.c_str(), text_length, pTextFormat3.get(), layout_cx, layout_cy, pTextLayout.put()));
+		winrt::check_hresult(pFactory6->CreateTextLayout(text.c_str(), text_length, pTextFormat3.get(), layout_cx, layout_cy, pTextLayout.put()));
 
 		pTextLayout->SetTextAlignment(align);
 		pTextLayout->SetParagraphAlignment(valign);
@@ -609,10 +680,13 @@ bool obs_dwrite_text_source::create_text_layout(
 		}
 	}
 	catch (winrt::hresult_error& e) {
+		error("Modern text layout failed with code %#08x (%s)", e.code().value,
+			to_string(e.message()).c_str());
+
 		if (FAILED(pDWriteFactory->CreateTextFormat(
 			font_face.c_str(),
 			NULL, (DWRITE_FONT_WEIGHT)weight, style, (DWRITE_FONT_STRETCH)stretch, (float)face_size / 96.0f * 72.0f,
-			localeName, pTextFormat.put())))
+			obs_locale.c_str(), pTextFormat.put())))
 			return false;
 
 		pTextFormat->SetTextAlignment(align);
@@ -632,9 +706,9 @@ bool obs_dwrite_text_source::create_text_layout(
 
 void obs_dwrite_text_source::draw_text()
 {
-	if (pTextRenderer)
-		pTextRenderer = nullptr;
+	obs_graphics_t gr;
 
+	pTextRenderer = nullptr;
 	pTextFormat = nullptr;
 	pTextLayout = nullptr;
 
@@ -693,41 +767,38 @@ void obs_dwrite_text_source::draw_text()
 	if (!create_text_layout(font_face, weight, stretch, style, text_length, layout_cx, layout_cy))
 		return;
 
-	if (SUCCEEDED(hr)) {
-		DWRITE_TEXT_RANGE text_range = { 0, text_length };
-		pTextLayout->SetUnderline(underline, text_range);
-		pTextLayout->SetStrikethrough(strikeout, text_range);
-		pTextLayout->SetWordWrapping(wrap);
+	DWRITE_TEXT_RANGE text_range = { 0, text_length };
+	pTextLayout->SetUnderline(underline, text_range);
+	pTextLayout->SetStrikethrough(strikeout, text_range);
+	pTextLayout->SetWordWrapping(wrap);
 
-		for (auto&& run : runs) {
-			DWRITE_TEXT_RANGE run_range = { run.start, run.length };
+	for (auto&& run : runs) {
+		DWRITE_TEXT_RANGE run_range = { run.start, run.length };
 
-			if (run.format == format_flags::bold) {
-				pTextLayout->SetFontWeight(DWRITE_FONT_WEIGHT_BOLD, run_range);
-			}
-
-			if (run.format == format_flags::italic) {
-				pTextLayout->SetFontStyle(DWRITE_FONT_STYLE_ITALIC, run_range);
-			}
-
-			if (run.format == format_flags::underline) {
-				pTextLayout->SetUnderline(true, run_range);
-			}
-
-			if (run.format == format_flags::strikethrough) {
-				pTextLayout->SetStrikethrough(true, run_range);
-			}
-
-			if (run.size.has_value()) {
-				pTextLayout->SetFontSize(run.size.value(), run_range);
-			}
+		if (run.format == format_flags::bold) {
+			pTextLayout->SetFontWeight(DWRITE_FONT_WEIGHT_BOLD, run_range);
 		}
 
-		if (text_trimming != S_TRIMMING_NONE) {
-			winrt::com_ptr<IDWriteInlineObject> inlineObject;
-			pDWriteFactory->CreateEllipsisTrimmingSign(pTextFormat.get(),
-				inlineObject.put());
+		if (run.format == format_flags::italic) {
+			pTextLayout->SetFontStyle(DWRITE_FONT_STYLE_ITALIC, run_range);
+		}
 
+		if (run.format == format_flags::underline) {
+			pTextLayout->SetUnderline(true, run_range);
+		}
+
+		if (run.format == format_flags::strikethrough) {
+			pTextLayout->SetStrikethrough(true, run_range);
+		}
+
+		if (run.size.has_value()) {
+			pTextLayout->SetFontSize(run.size.value(), run_range);
+		}
+	}
+
+	if (text_trimming != S_TRIMMING_NONE) {
+		winrt::com_ptr<IDWriteInlineObject> inlineObject;
+		if (SUCCEEDED(pDWriteFactory->CreateEllipsisTrimmingSign(pTextFormat.get(), inlineObject.put()))) {
 			DWRITE_TRIMMING trimming = { (text_trimming == S_TRIMMING_CHARACTER_ELLIPSIS
 								 ? DWRITE_TRIMMING_GRANULARITY_CHARACTER
 								 : DWRITE_TRIMMING_GRANULARITY_WORD),
@@ -735,91 +806,92 @@ void obs_dwrite_text_source::draw_text()
 
 			pTextLayout->SetTrimming(&trimming, inlineObject.get());
 		}
-		else {
-			DWRITE_TRIMMING trimming = { DWRITE_TRIMMING_GRANULARITY_NONE, 0, 0 };
-			pTextLayout->SetTrimming(&trimming, nullptr);
-		}
-
-		pTextLayout->SetMaxWidth(layout_cx);
-		pTextLayout->SetMaxHeight(layout_cy);
+	}
+	else {
+		DWRITE_TRIMMING trimming = { DWRITE_TRIMMING_GRANULARITY_NONE, 0, 0 };
+		pTextLayout->SetTrimming(&trimming, nullptr);
 	}
 
-	// calculate size
-	if (SUCCEEDED(hr)) {
-		DWRITE_TEXT_METRICS textMetrics;
-		hr = pTextLayout->GetMetrics(&textMetrics);
+	pTextLayout->SetMaxWidth(layout_cx);
+	pTextLayout->SetMaxHeight(layout_cy);
 
-		text_cx = ceil(textMetrics.widthIncludingTrailingWhitespace);
-		text_cy = ceil(textMetrics.height);
-		lines = textMetrics.lineCount;
-
-		if (isnan(text_cx))
-			text_cx = MAX_SIZE_CX;
-		if (isnan(text_cy))
-			text_cy = MAX_SIZE_CY;
-
-		if (!use_extents || extents_cx == -1) {
-			layout_cx = text_cx;
-		}
-
-		if (!use_extents || extents_cy == -1) {
-			layout_cy = text_cy;
-		}
-
-		clamp_assign(layout_cx, MIN_SIZE_CX, MAX_SIZE_CX);
-		clamp_assign(layout_cy, MIN_SIZE_CY, MAX_SIZE_CY);
-
-		calculated_size = { (uint32_t)layout_cx, (uint32_t)layout_cy };
+	DWRITE_TEXT_METRICS textMetrics;
+	if (FAILED(hr = pTextLayout->GetMetrics(&textMetrics))) {
+		error("pTextLayout->GetMetrics(&textMetrics) failed with code %#08x", hr);
+		return;
 	}
+
+	text_cx = ceil(textMetrics.widthIncludingTrailingWhitespace);
+	text_cy = ceil(textMetrics.height);
+	lines = textMetrics.lineCount;
+
+	if (isnan(text_cx))
+		text_cx = MAX_SIZE_CX;
+	if (isnan(text_cy))
+		text_cy = MAX_SIZE_CY;
+
+	if (!use_extents || extents_cx == -1) {
+		layout_cx = text_cx;
+	}
+
+	if (!use_extents || extents_cy == -1) {
+		layout_cy = text_cy;
+	}
+
+	clamp_assign(layout_cx, MIN_SIZE_CX, MAX_SIZE_CX);
+	clamp_assign(layout_cy, MIN_SIZE_CY, MAX_SIZE_CY);
+
+	calculated_size = { (uint32_t)layout_cx, (uint32_t)layout_cy };
 
 	if (!pTarget || !targetTexture || size != calculated_size || calculated_padding != padding) {
-		obs_enter_graphics();
-
 		if (!create_render_target_d3d11(calculated_size, calculated_padding)) {
-			obs_leave_graphics();
 			return;
 		}
-
-		obs_leave_graphics();
 
 		size = calculated_size;
 		padding = calculated_padding;
 	}
 
-	if (SUCCEEDED(hr)) {
-		update_brush(text_cx, text_cy / lines);
+	update_brush(text_cx, text_cy / lines);
 
-		pTextRenderer.attach(new OBSTextRenderer(pDWriteFactory.get(), pD2DFactory.get(),
-			pD2DContext.get(), pOutlineBrush.get(),
-			pFillBrush.get(), outline_size, color_fonts));
+	pTextRenderer.attach(new OBSTextRenderer(pDWriteFactory.get(), pD2DFactory.get(),
+		pD2DContext.get(), pOutlineBrush.get(),
+		pFillBrush.get(), outline_size, color_fonts));
 
-		pD2DContext->BeginDraw();
-		pD2DContext->SetTarget(pTextTarget.get());
-		pD2DContext->SetTransform(D2D1::IdentityMatrix());
-		pD2DContext->Clear(D2D1::ColorF(0, 0, 0, 0));
+	pD2DContext->BeginDraw();
+	pD2DContext->SetTarget(pTextTarget.get());
+	pD2DContext->SetTransform(D2D1::IdentityMatrix());
+	pD2DContext->Clear(D2D1::ColorF(0, 0, 0, 0));
 
-		pD2DContext->SetTextAntialiasMode(antialias ? D2D1_TEXT_ANTIALIAS_MODE_GRAYSCALE
-			: D2D1_TEXT_ANTIALIAS_MODE_ALIASED);
+	pD2DContext->SetTextAntialiasMode(antialias ? D2D1_TEXT_ANTIALIAS_MODE_GRAYSCALE
+		: D2D1_TEXT_ANTIALIAS_MODE_ALIASED);
 
-		pTextLayout->Draw(NULL, pTextRenderer.get(), 0, 0);
+	pTextLayout->Draw(NULL, pTextRenderer.get(), 0, 0);
 
-		hr = pD2DContext->EndDraw();
+	hr = pD2DContext->EndDraw();
+	if (FAILED(hr)) {
+		error("pD2DContext->EndDraw() failed with code %#08x", hr);
+		return;
+	}
 
-		update_effects();
+	update_effects();
 
-		pD2DContext->BeginDraw();
-		pD2DContext->SetTarget(pTarget.get());
-		pD2DContext->SetTransform(D2D1::IdentityMatrix());
-		pD2DContext->Clear(D2D1::ColorF(bk_color, bk_opacity / 100.0f));
+	pD2DContext->BeginDraw();
+	pD2DContext->SetTarget(pTarget.get());
+	pD2DContext->SetTransform(D2D1::IdentityMatrix());
+	pD2DContext->Clear(D2D1::ColorF(bk_color, bk_opacity / 100.0f));
 
-		if (pEffect) {
-			pD2DContext->DrawImage(pEffect.get(), D2D1::Point2F(padding.left, padding.top));
-		}
-		else {
-			pD2DContext->DrawImage(pTextTarget.get(), D2D1::Point2F(padding.left, padding.top));
-		}
+	if (pEffect) {
+		pD2DContext->DrawImage(pEffect.get(), D2D1::Point2F(padding.left, padding.top));
+	}
+	else {
+		pD2DContext->DrawImage(pTextTarget.get(), D2D1::Point2F(padding.left, padding.top));
+	}
 
-		hr = pD2DContext->EndDraw();
+	hr = pD2DContext->EndDraw();
+	if (FAILED(hr)) {
+		error("pD2DContext->EndDraw() failed with code %#08x", hr);
+		return;
 	}
 }
 
@@ -827,6 +899,7 @@ void obs_dwrite_text_source::transform_text()
 {
 	const std::locale loc = std::locale(obs_get_locale());
 	const std::ctype<wchar_t>& f = std::use_facet<std::ctype<wchar_t>>(loc);
+
 	if (text_transform == S_TRANSFORM_UPPERCASE)
 		f.toupper(&text[0], &text[0] + text.size());
 	else if (text_transform == S_TRANSFORM_LOWERCASE)
@@ -1104,6 +1177,8 @@ inline void obs_dwrite_text_source::Render(gs_effect_t*)
 	if (!targetTexture)
 		return;
 
+	obs_graphics_t gs;
+
 	gs_texture_t* texture = targetTexture;
 	gs_effect_t* effect = obs_get_base_effect(OBS_EFFECT_DEFAULT);
 	gs_technique_t* tech = gs_effect_get_technique(effect, "Draw");
@@ -1170,19 +1245,6 @@ static bool weight_changed(obs_properties_t* props, obs_property_t* p, obs_data_
 	return false;
 }
 
-static const float stretchToWidth[] = {
-	0.0f,    // undefined (0)
-	50.0f,   // ultra-condensed
-	62.5f,   // extra-condensed
-	75.0f,   // condensed
-	87.5f,   // semi-condensed
-	100.0f,  // normal
-	112.5f,  // semi-expanded
-	125.0f,  // expanded
-	150.0f,  // extra-expanded
-	200.0f,  // ultra-expanded
-};
-
 static int widthToStretch(float width)
 {
 	int best = 0;
@@ -1214,16 +1276,18 @@ static bool stretch_changed(obs_properties_t* props, obs_property_t* p, obs_data
 
 static bool is_standard_axis(DWRITE_FONT_AXIS_TAG tag)
 {
+	// allow adjustment of optical size, we dont really know the 1:1 scale at which text will appear on screen
 	return tag == DWRITE_FONT_AXIS_TAG_WEIGHT ||
 		tag == DWRITE_FONT_AXIS_TAG_WIDTH ||
 		tag == DWRITE_FONT_AXIS_TAG_ITALIC ||
-		tag == DWRITE_FONT_AXIS_TAG_SLANT ||
-		tag == DWRITE_FONT_AXIS_TAG_OPTICAL_SIZE;
+		tag == DWRITE_FONT_AXIS_TAG_SLANT /*||
+		tag == DWRITE_FONT_AXIS_TAG_OPTICAL_SIZE*/;
 }
 
 static bool font_changed(void* priv, obs_properties_t* props, obs_property_t* p, obs_data_t* s) {
 
 	obs_dwrite_text_source* src = reinterpret_cast<obs_dwrite_text_source*>(priv);
+#define this src
 
 	std::wstring familyName = to_wide(obs_data_get_string(s, S_FONT_FACE));
 	std::string font_style{ obs_data_get_string(s, S_FONT_STYLE) };
@@ -1258,6 +1322,7 @@ static bool font_changed(void* priv, obs_properties_t* props, obs_property_t* p,
 
 	obs_property_t* variable_props = obs_properties_get(props, S_VARIABLE);
 	obs_properties_t* variable_group = obs_property_group_content(variable_props);
+
 	auto fontFace5 = fontFace.try_as<IDWriteFontFace5>();
 	if (fontFace5 && fontFace5->HasVariations())
 	{
@@ -1298,7 +1363,7 @@ static bool font_changed(void* priv, obs_properties_t* props, obs_property_t* p,
 			float maxVal = axisRanges[i].maxValue;
 
 			// e.g. "wght: 400.0 [100.0 - 900.0]"
-			blog(LOG_INFO, "axis '%s': %.1f [%.1f - %.1f]", tagStr, current, minVal, maxVal);
+			info("axis '%s': %.1f [%.1f - %.1f]", tagStr, current, minVal, maxVal);
 
 			if (is_standard_axis(t)) {
 				if (t == DWRITE_FONT_AXIS_TAG_WEIGHT) {
@@ -1342,6 +1407,7 @@ static bool font_changed(void* priv, obs_properties_t* props, obs_property_t* p,
 	}
 
 	return true;
+#undef this
 }
 
 static bool outline_changed(obs_properties_t* props, obs_property_t* p, obs_data_t* s)
@@ -1406,9 +1472,6 @@ static bool extents_modified(obs_properties_t* props, obs_property_t* p, obs_dat
 #undef set_vis
 
 static void upgrade_properties(void* data, obs_data_t* settings) {
-
-	WCHAR localeName[LOCALE_NAME_MAX_LENGTH] = { 0 };
-	GetUserDefaultLocaleName(localeName, LOCALE_NAME_MAX_LENGTH);
 
 	obs_data_t* font_obj = obs_data_get_obj(settings, S_FONT);
 	if (!font_obj)
@@ -1494,8 +1557,7 @@ static void upgrade_properties(void* data, obs_data_t* settings) {
 
 static obs_properties_t* get_properties(void* data)
 {
-	WCHAR localeName[LOCALE_NAME_MAX_LENGTH] = { 0 };
-	GetUserDefaultLocaleName(localeName, LOCALE_NAME_MAX_LENGTH);
+	std::wstring obs_locale = to_wide(obs_get_locale());
 
 	obs_dwrite_text_source* s = reinterpret_cast<obs_dwrite_text_source*>(data);
 	if (s == nullptr)
@@ -1560,7 +1622,7 @@ static obs_properties_t* get_properties(void* data)
 			UINT32 index = 0;
 			UINT32 length = 0;
 			BOOL exists = false;
-			if (SUCCEEDED(hr = pFamilyNames->FindLocaleName(localeName, &index, &exists)) && exists) {
+			if (SUCCEEDED(hr = pFamilyNames->FindLocaleName(obs_locale.c_str(), &index, &exists)) && exists) {
 				pFamilyNames->GetStringLength(index, &length);
 				locale_name.resize(length);
 				pFamilyNames->GetString(index, locale_name.data(), length + 1);
@@ -1595,7 +1657,7 @@ static obs_properties_t* get_properties(void* data)
 
 	obs_property_set_modified_callback2(p, font_changed, s);
 
-	p = obs_properties_add_float(font_group,S_FONT_SIZE, T_FONT_SIZE, 1, 500, 1);
+	p = obs_properties_add_float(font_group, S_FONT_SIZE, T_FONT_SIZE, 1, 500, 1);
 	obs_property_set_modified_callback(p, weight_changed);
 
 	p = obs_properties_add_float_slider(font_group, S_FONT_WEIGHT "_variable", T_FONT_WEIGHT, S_FONT_WEIGHT_100, S_FONT_WEIGHT_950, 0.1);
@@ -1646,6 +1708,9 @@ static obs_properties_t* get_properties(void* data)
 	obs_property_set_modified_callback(p, line_spacing_changed);
 
 	obs_properties_add_float(font_group, S_LINE_SPACING_RATIO, T_LINE_SPACING_RATIO, 0.01, 256, 1);
+
+	obs_properties_add_bool(font_group, S_FONT_UNDERLINE, T_FONT_UNDERLINE);
+	obs_properties_add_bool(font_group, S_FONT_STRIKETHROUGH, T_FONT_STRIKETHROUGH);
 
 	obs_properties_t* variable_group = obs_properties_create();
 	p = obs_properties_add_group(props, S_VARIABLE, T_VARIABLE, OBS_GROUP_NORMAL, variable_group);
@@ -1775,17 +1840,14 @@ bool obs_module_load(void)
 		return reinterpret_cast<obs_dwrite_text_source*>(data)->get_height();
 		};
 	si.get_defaults = [](obs_data_t* settings) {
-		//obs_data_t* font_obj = obs_data_create();
 		obs_data_set_default_string(settings, S_FONT_FACE, "Arial");
 		obs_data_set_default_int(settings, S_FONT_SIZE, 256);
 		obs_data_set_default_string(settings, S_FONT_STYLE, S_FONT_STYLE_NONE);
-		//obs_data_set_default_obj(settings, S_FONT, font_obj);
-
 		obs_data_set_default_string(settings, S_ALIGN, S_ALIGN_LEFT);
 		obs_data_set_default_string(settings, S_VALIGN, S_VALIGN_TOP);
 		obs_data_set_default_string(settings, S_WRAP_MODE, S_WRAP_MODE_WRAP);
-		obs_data_set_default_int(settings, S_FONT_WEIGHT, S_FONT_WEIGHT_AUTO);
-		obs_data_set_default_int(settings, S_FONT_STRETCH, S_FONT_STRETCH_AUTO);
+		obs_data_set_default_int(settings, S_FONT_WEIGHT, S_FONT_WEIGHT_400);
+		obs_data_set_default_int(settings, S_FONT_STRETCH, S_FONT_STRETCH_NORMAL);
 		obs_data_set_default_int(settings, S_COLOR, 0xFFFFFF);
 		obs_data_set_default_int(settings, S_GRADIENT_EX_COUNT, 1);
 		obs_data_set_default_int(settings, S_OPACITY, 100);
@@ -1803,8 +1865,6 @@ bool obs_module_load(void)
 		obs_data_set_default_int(settings, S_EXTENTS_CY, 100);
 		obs_data_set_default_bool(settings, S_COLOR_FONTS, true);
 		obs_data_set_default_bool(settings, S_ANTIALIASING, true);
-
-		//obs_data_release(font_obj);
 		};
 	si.update = [](void* data, obs_data_t* settings) {
 		reinterpret_cast<obs_dwrite_text_source*>(data)->Update(settings);

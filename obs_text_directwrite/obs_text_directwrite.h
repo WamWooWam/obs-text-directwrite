@@ -6,6 +6,7 @@
 #include <sys/stat.h>
 #include <windows.h>
 #include <algorithm>
+#include <set>
 #include <string>
 #include <memory>
 #include <locale>
@@ -168,8 +169,7 @@ private:
 	bool color_fonts = true;
 	bool antialias = true;
 
-	// TODO: all font features :)
-	bool tabular_figures = false;
+	std::set<DWRITE_FONT_FEATURE_TAG> font_features;
 
 	//bool vertical = false;
 

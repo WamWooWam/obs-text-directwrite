@@ -6,8 +6,8 @@
 #include <sys/stat.h>
 #include <windows.h>
 #include <algorithm>
-#include <set>
 #include <string>
+#include <map>
 #include <memory>
 #include <locale>
 #include <vector>
@@ -49,6 +49,15 @@
 #define MAX_GRADIENT_STOPS 16
 
 using namespace Microsoft::WRL;
+
+using font_feature_tag = std::pair<const char *, DWRITE_FONT_FEATURE_TAG>;
+
+struct compare_font_feature_tag {
+	bool operator()(const font_feature_tag &lhs, const font_feature_tag &rhs) const
+	{
+		return lhs.second < rhs.second;
+	}
+};
 
 enum class format_flags : int {
 	none,
@@ -169,7 +178,7 @@ private:
 	bool color_fonts = true;
 	bool antialias = true;
 
-	std::set<DWRITE_FONT_FEATURE_TAG> font_features;
+	std::map<const font_feature_tag, UINT32, compare_font_feature_tag> font_features;
 
 	//bool vertical = false;
 

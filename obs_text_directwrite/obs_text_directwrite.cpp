@@ -1,6 +1,8 @@
 
 #include "obs_text_directwrite.h"
 
+#include <set>
+
 /* ------------------------------------------------------------------------- */
 
 #define S_FONT "font"
@@ -445,8 +447,8 @@ static const float stretchToWidth[] = {
 	200.0f,  // ultra-expanded
 };
 
-static const std::pair<const char *, DWRITE_FONT_FEATURE_TAG>
-	font_feature_map[] = {
+static const std::set<font_feature_tag, std::less<>>
+	font_feature_set = {
 	{"font_feature_alternative_fractions", DWRITE_FONT_FEATURE_TAG_ALTERNATIVE_FRACTIONS},
 	{"font_feature_petite_capitals_from_capitals", DWRITE_FONT_FEATURE_TAG_PETITE_CAPITALS_FROM_CAPITALS},
 	{"font_feature_small_capitals_from_capitals", DWRITE_FONT_FEATURE_TAG_SMALL_CAPITALS_FROM_CAPITALS},
@@ -531,6 +533,21 @@ static const std::pair<const char *, DWRITE_FONT_FEATURE_TAG>
 	 DWRITE_FONT_FEATURE_TAG_VERTICAL_ALTERNATES_AND_ROTATION},
 	{"font_feature_slashed_zero", DWRITE_FONT_FEATURE_TAG_SLASHED_ZERO},
 };
+
+bool operator<(const font_feature_tag& a, const font_feature_tag& b)
+{
+	return a.second < b.second;
+}
+
+bool operator<(const font_feature_tag& a, const DWRITE_FONT_FEATURE_TAG& b)
+{
+	return a.second < b;
+}
+
+bool operator<(const DWRITE_FONT_FEATURE_TAG& a, const font_feature_tag& b)
+{
+	return a < b.second;
+}
 
 static void upgrade_properties(void* data, obs_data_t* settings);
 
@@ -1034,8 +1051,8 @@ void obs_dwrite_text_source::draw_text()
 	if (!this->font_features.empty()) {
 		winrt::com_ptr<IDWriteTypography> pTypography;
 		if (SUCCEEDED(pDWriteFactory->CreateTypography(pTypography.put()))) {
-			for (auto featureTag : this->font_features) {
-				pTypography->AddFontFeature(DWRITE_FONT_FEATURE{featureTag, 1u});
+			for (auto [featureTag, value] : this->font_features) {
+				pTypography->AddFontFeature(DWRITE_FONT_FEATURE{featureTag.second, value});
 			}
 			pTextLayout->SetTypography(pTypography.get(), text_range);
 		}
@@ -1413,9 +1430,10 @@ inline void obs_dwrite_text_source::Update(obs_data_t* s)
 
 	// Build font_features set from settings
 	this->font_features.clear();
-	for (const auto &entry : font_feature_map) {
-		if (obs_data_get_bool(s, entry.first)) {
-			this->font_features.insert(entry.second);
+	for (const auto &entry : font_feature_set) {
+		auto value = obs_data_get_bool(s, entry.first);
+		if (value > 0) {
+			this->font_features.insert_or_assign(entry, (UINT32)value);
 		}
 	}
 
@@ -1599,7 +1617,7 @@ static bool font_changed(void* priv, obs_properties_t* props, obs_property_t* p,
 
 	// Hide all feature properties first, and then update if supported, to avoid showing
 	// unsupported features when switching between fonts with different feature support
-	for (const auto &entry : font_feature_map) {
+	for (const auto &entry : font_feature_set) {
 		obs_property_t *feat_prop = obs_properties_get(props, entry.first);
 		obs_property_set_visible(feat_prop, false);
 	}
@@ -1609,25 +1627,36 @@ static bool font_changed(void* priv, obs_properties_t* props, obs_property_t* p,
 	winrt::check_hresult(pFactory->CreateTextAnalyzer(pTextAnalyzer.put()));
 	auto pTextAnalyzer2 = pTextAnalyzer.try_as<IDWriteTextAnalyzer2>();
 	if (pTextAnalyzer2) {
-		std::vector<DWRITE_FONT_FEATURE_TAG> features = {};
+		std::vector<DWRITE_FONT_FEATURE_TAG> featureTags = {};
 		UINT32 featureCount = 0;
 		HRESULT hr = pTextAnalyzer2->GetTypographicFeatures(
 			fontFace.get(), DWRITE_SCRIPT_ANALYSIS{0, DWRITE_SCRIPT_SHAPES_DEFAULT},
-			nullptr, 0, &featureCount, features.data());
+			nullptr, 0, &featureCount, featureTags.data());
 
 		if (featureCount > 0) {
-			features.resize(featureCount);
+			featureTags.resize(featureCount);
 			hr = pTextAnalyzer2->GetTypographicFeatures(
 				fontFace.get(), DWRITE_SCRIPT_ANALYSIS{0, DWRITE_SCRIPT_SHAPES_DEFAULT},
-				nullptr, featureCount, &featureCount, features.data());
+				nullptr, featureCount, &featureCount, featureTags.data());
 			blog(LOG_INFO, "font_changed: Font supports %u typographic features", featureCount);
 
 			// Toggle visibility of each known font-feature property based on support
-			for (const auto &entry : font_feature_map) {
-				obs_property_t *feat_prop = obs_properties_get(props, entry.first);
-				bool supported = std::find(features.begin(), features.end(), entry.second) !=
-						 features.end();
-				obs_property_set_visible(feat_prop, supported);
+			for (const auto featureTag : featureTags) {
+				const auto &key = font_feature_set.find(featureTag);
+				if (key != font_feature_set.end()) {
+					obs_property_t *feat_prop = obs_properties_get(props, key->first);
+					if (feat_prop != nullptr) {
+						obs_property_set_visible(feat_prop, true);
+					} else {
+						blog(LOG_WARNING, "font_changed: Failed to find property for supported font feature with tag '%c%c%c%c'",
+							 (featureTag & 0xFF), ((featureTag >> 8) & 0xFF),
+						     ((featureTag >> 16) & 0xFF), ((featureTag >> 24) & 0xFF));
+					}
+				} else {
+					blog(LOG_WARNING, "font_changed: Font supports unknown typographic feature with tag '%c%c%c%c'",
+					     (featureTag & 0xFF), ((featureTag >> 8) & 0xFF),
+					     ((featureTag >> 16) & 0xFF), ((featureTag >> 24) & 0xFF));
+				}
 			}
 		} else {
 			blog(LOG_INFO, "font_changed: Font does not support any typographic features? %u",

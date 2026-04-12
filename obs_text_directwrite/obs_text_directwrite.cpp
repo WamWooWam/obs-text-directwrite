@@ -224,6 +224,7 @@
 
 #define T_(v) obs_module_text(v)
 #define T_FONT				T_("Font")
+#define T_FONT_FACE			T_("FontFamily")
 #define T_USE_FILE			T_("ReadFromFile")
 #define T_FILE				T_("TextFile")
 #define T_TEXT				T_("Text")
@@ -447,15 +448,13 @@ static const float stretchToWidth[] = {
 	200.0f,  // ultra-expanded
 };
 
-static const std::set<font_feature_tag, std::less<>>
-	font_feature_set = {
+static const std::set<font_feature_tag, std::less<>> font_feature_set = {
 	{"font_feature_alternative_fractions", DWRITE_FONT_FEATURE_TAG_ALTERNATIVE_FRACTIONS},
 	{"font_feature_petite_capitals_from_capitals", DWRITE_FONT_FEATURE_TAG_PETITE_CAPITALS_FROM_CAPITALS},
 	{"font_feature_small_capitals_from_capitals", DWRITE_FONT_FEATURE_TAG_SMALL_CAPITALS_FROM_CAPITALS},
 	{"font_feature_contextual_alternates", DWRITE_FONT_FEATURE_TAG_CONTEXTUAL_ALTERNATES},
 	{"font_feature_case_sensitive_forms", DWRITE_FONT_FEATURE_TAG_CASE_SENSITIVE_FORMS},
-	{"font_feature_glyph_composition_decomposition",
-	 DWRITE_FONT_FEATURE_TAG_GLYPH_COMPOSITION_DECOMPOSITION},
+	{"font_feature_glyph_composition_decomposition", DWRITE_FONT_FEATURE_TAG_GLYPH_COMPOSITION_DECOMPOSITION},
 	{"font_feature_contextual_ligatures", DWRITE_FONT_FEATURE_TAG_CONTEXTUAL_LIGATURES},
 	{"font_feature_capital_spacing", DWRITE_FONT_FEATURE_TAG_CAPITAL_SPACING},
 	{"font_feature_contextual_swash", DWRITE_FONT_FEATURE_TAG_CONTEXTUAL_SWASH},
@@ -524,14 +523,15 @@ static const std::set<font_feature_tag, std::less<>>
 	{"font_feature_swash", DWRITE_FONT_FEATURE_TAG_SWASH},
 	{"font_feature_titling", DWRITE_FONT_FEATURE_TAG_TITLING},
 	{"font_feature_traditional_name_forms", DWRITE_FONT_FEATURE_TAG_TRADITIONAL_NAME_FORMS},
-	{"font_feature_tabular_figures", DWRITE_FONT_FEATURE_TAG_TABULAR_FIGURES},
 	{"font_feature_traditional_forms", DWRITE_FONT_FEATURE_TAG_TRADITIONAL_FORMS},
 	{"font_feature_third_widths", DWRITE_FONT_FEATURE_TAG_THIRD_WIDTHS},
 	{"font_feature_unicase", DWRITE_FONT_FEATURE_TAG_UNICASE},
 	{"font_feature_vertical_writing", DWRITE_FONT_FEATURE_TAG_VERTICAL_WRITING},
-	{"font_feature_vertical_alternates_and_rotation",
-	 DWRITE_FONT_FEATURE_TAG_VERTICAL_ALTERNATES_AND_ROTATION},
+	{"font_feature_vertical_alternates_and_rotation", DWRITE_FONT_FEATURE_TAG_VERTICAL_ALTERNATES_AND_ROTATION},
 	{"font_feature_slashed_zero", DWRITE_FONT_FEATURE_TAG_SLASHED_ZERO},
+
+	// special name because im stupid Sorry
+	{"tabular_figures", DWRITE_FONT_FEATURE_TAG_TABULAR_FIGURES},
 };
 
 bool operator<(const font_feature_tag& a, const font_feature_tag& b)
@@ -1052,7 +1052,7 @@ void obs_dwrite_text_source::draw_text()
 		winrt::com_ptr<IDWriteTypography> pTypography;
 		if (SUCCEEDED(pDWriteFactory->CreateTypography(pTypography.put()))) {
 			for (auto [featureTag, value] : this->font_features) {
-				pTypography->AddFontFeature(DWRITE_FONT_FEATURE{featureTag.second, value});
+				pTypography->AddFontFeature(DWRITE_FONT_FEATURE{ featureTag.second, value });
 			}
 			pTextLayout->SetTypography(pTypography.get(), text_range);
 		}
@@ -1331,27 +1331,23 @@ inline void obs_dwrite_text_source::Update(obs_data_t* s)
 
 	std::wstring new_face = to_wide(new_font_face);
 
-	if (new_face != face || face_size != new_font_size || new_font_weight != weight || font_style != new_font_style ||
-		new_underline != underline || new_strikeout != strikeout || new_font_stretch != stretch ||
-		new_line_spacing != line_spacing || new_line_spacing_ratio != line_spacing_ratio) {
-		face = new_face;
-		face_size = new_font_size;
-		weight = new_font_weight;
-		font_style = new_font_style;
-		underline = new_underline;
-		strikeout = new_strikeout;
-		stretch = new_font_stretch;
+	face = new_face;
+	face_size = new_font_size;
+	weight = new_font_weight;
+	font_style = new_font_style;
+	underline = new_underline;
+	strikeout = new_strikeout;
+	stretch = new_font_stretch;
 
-		if (font_style == S_FONT_STYLE_ITALIC)
-			style = DWRITE_FONT_STYLE::DWRITE_FONT_STYLE_ITALIC;
-		else if (font_style == S_FONT_STYLE_OBLIQUE)
-			style = DWRITE_FONT_STYLE::DWRITE_FONT_STYLE_OBLIQUE;
-		else
-			style = DWRITE_FONT_STYLE::DWRITE_FONT_STYLE_NORMAL;
+	if (font_style == S_FONT_STYLE_ITALIC)
+		style = DWRITE_FONT_STYLE::DWRITE_FONT_STYLE_ITALIC;
+	else if (font_style == S_FONT_STYLE_OBLIQUE)
+		style = DWRITE_FONT_STYLE::DWRITE_FONT_STYLE_OBLIQUE;
+	else
+		style = DWRITE_FONT_STYLE::DWRITE_FONT_STYLE_NORMAL;
 
-		line_spacing = (DWRITE_LINE_SPACING_METHOD)new_line_spacing;
-		line_spacing_ratio = new_line_spacing_ratio;
-	}
+	line_spacing = (DWRITE_LINE_SPACING_METHOD)new_line_spacing;
+	line_spacing_ratio = new_line_spacing_ratio;
 
 	new_o_color = rgb_to_bgr(new_o_color);
 	new_bk_color = rgb_to_bgr(new_bk_color);
@@ -1430,7 +1426,7 @@ inline void obs_dwrite_text_source::Update(obs_data_t* s)
 
 	// Build font_features set from settings
 	this->font_features.clear();
-	for (const auto &entry : font_feature_set) {
+	for (const auto& entry : font_feature_set) {
 		auto value = obs_data_get_bool(s, entry.first);
 		if (value > 0) {
 			this->font_features.insert_or_assign(entry, (UINT32)value);
@@ -1529,56 +1525,6 @@ static bool use_file_changed(obs_properties_t* props, obs_property_t* p, obs_dat
 	return true;
 }
 
-static bool weight_changed(obs_properties_t* props, obs_property_t* p, obs_data_t* s)
-{
-	if (obs_property_get_type(p) == OBS_PROPERTY_FLOAT) {
-		obs_data_set_int(s, S_FONT_WEIGHT, (int)ceilf(obs_data_get_double(s, S_FONT_WEIGHT "_variable") / 100) * 100);
-	}
-	if (obs_property_get_type(p) == OBS_PROPERTY_LIST) {
-		obs_data_set_double(s, S_FONT_WEIGHT "_variable", obs_data_get_int(s, S_FONT_WEIGHT));
-	}
-	return false;
-}
-
-static int widthToStretch(float width)
-{
-	int best = 0;
-	float bestDiff = fabsf(width - stretchToWidth[0]);
-
-	for (int i = 1; i < 10; i++) {
-		float diff = fabsf(width - stretchToWidth[i]);
-		if (diff < bestDiff) {
-			best = i;
-			bestDiff = diff;
-		}
-	}
-
-	return best;
-}
-
-static bool stretch_changed(obs_properties_t* props, obs_property_t* p, obs_data_t* s)
-{
-	if (obs_property_get_type(p) == OBS_PROPERTY_FLOAT) {
-		obs_data_set_int(s, S_FONT_STRETCH, widthToStretch(obs_data_get_double(s, S_FONT_STRETCH "_variable")));
-	}
-	if (obs_property_get_type(p) == OBS_PROPERTY_LIST) {
-		int stretch = obs_data_get_int(s, S_FONT_STRETCH);
-
-		obs_data_set_double(s, S_FONT_STRETCH "_variable", stretchToWidth[(int)stretch]);
-	}
-	return false;
-}
-
-static bool is_standard_axis(DWRITE_FONT_AXIS_TAG tag)
-{
-	// allow adjustment of optical size, we dont really know the 1:1 scale at which text will appear on screen
-	return tag == DWRITE_FONT_AXIS_TAG_WEIGHT ||
-		tag == DWRITE_FONT_AXIS_TAG_WIDTH ||
-		tag == DWRITE_FONT_AXIS_TAG_ITALIC ||
-		tag == DWRITE_FONT_AXIS_TAG_SLANT /*||
-		tag == DWRITE_FONT_AXIS_TAG_OPTICAL_SIZE*/;
-}
-
 static bool font_changed(void* priv, obs_properties_t* props, obs_property_t* p, obs_data_t* s) {
 
 	obs_dwrite_text_source* src = reinterpret_cast<obs_dwrite_text_source*>(priv);
@@ -1601,24 +1547,24 @@ static bool font_changed(void* priv, obs_properties_t* props, obs_property_t* p,
 	UINT32 familyIndex = 0;
 	BOOL exists = false;
 	if (FAILED(src->pSystemFontCollection->FindFamilyName(familyName.c_str(), &familyIndex, &exists)) || !exists)
-		return nullptr;
+		return false;
 
 	winrt::com_ptr<IDWriteFontFamily> fontFamily;
 	if (FAILED(src->pSystemFontCollection->GetFontFamily(familyIndex, fontFamily.put())))
-		return nullptr;
+		return false;
 
 	winrt::com_ptr<IDWriteFont> font;
 	if (FAILED(fontFamily->GetFirstMatchingFont(weight, stretch, style, font.put())))
-		return nullptr;
+		return false;
 
 	winrt::com_ptr<IDWriteFontFace> fontFace;
 	if (FAILED(font->CreateFontFace(fontFace.put())))
-		return nullptr;
+		return false;
 
 	// Hide all feature properties first, and then update if supported, to avoid showing
 	// unsupported features when switching between fonts with different feature support
-	for (const auto &entry : font_feature_set) {
-		obs_property_t *feat_prop = obs_properties_get(props, entry.first);
+	for (const auto& entry : font_feature_set) {
+		obs_property_t* feat_prop = obs_properties_get(props, entry.first);
 		obs_property_set_visible(feat_prop, false);
 	}
 
@@ -1630,37 +1576,40 @@ static bool font_changed(void* priv, obs_properties_t* props, obs_property_t* p,
 		std::vector<DWRITE_FONT_FEATURE_TAG> featureTags = {};
 		UINT32 featureCount = 0;
 		HRESULT hr = pTextAnalyzer2->GetTypographicFeatures(
-			fontFace.get(), DWRITE_SCRIPT_ANALYSIS{0, DWRITE_SCRIPT_SHAPES_DEFAULT},
+			fontFace.get(), DWRITE_SCRIPT_ANALYSIS{ 0, DWRITE_SCRIPT_SHAPES_DEFAULT },
 			nullptr, 0, &featureCount, featureTags.data());
 
 		if (featureCount > 0) {
 			featureTags.resize(featureCount);
 			hr = pTextAnalyzer2->GetTypographicFeatures(
-				fontFace.get(), DWRITE_SCRIPT_ANALYSIS{0, DWRITE_SCRIPT_SHAPES_DEFAULT},
+				fontFace.get(), DWRITE_SCRIPT_ANALYSIS{ 0, DWRITE_SCRIPT_SHAPES_DEFAULT },
 				nullptr, featureCount, &featureCount, featureTags.data());
 			blog(LOG_INFO, "font_changed: Font supports %u typographic features", featureCount);
 
 			// Toggle visibility of each known font-feature property based on support
 			for (const auto featureTag : featureTags) {
-				const auto &key = font_feature_set.find(featureTag);
+				const auto& key = font_feature_set.find(featureTag);
 				if (key != font_feature_set.end()) {
-					obs_property_t *feat_prop = obs_properties_get(props, key->first);
+					obs_property_t* feat_prop = obs_properties_get(props, key->first);
 					if (feat_prop != nullptr) {
 						obs_property_set_visible(feat_prop, true);
-					} else {
-						blog(LOG_WARNING, "font_changed: Failed to find property for supported font feature with tag '%c%c%c%c'",
-							 (featureTag & 0xFF), ((featureTag >> 8) & 0xFF),
-						     ((featureTag >> 16) & 0xFF), ((featureTag >> 24) & 0xFF));
 					}
-				} else {
+					else {
+						blog(LOG_WARNING, "font_changed: Failed to find property for supported font feature with tag '%c%c%c%c'",
+							(featureTag & 0xFF), ((featureTag >> 8) & 0xFF),
+							((featureTag >> 16) & 0xFF), ((featureTag >> 24) & 0xFF));
+					}
+				}
+				else {
 					blog(LOG_WARNING, "font_changed: Font supports unknown typographic feature with tag '%c%c%c%c'",
-					     (featureTag & 0xFF), ((featureTag >> 8) & 0xFF),
-					     ((featureTag >> 16) & 0xFF), ((featureTag >> 24) & 0xFF));
+						(featureTag & 0xFF), ((featureTag >> 8) & 0xFF),
+						((featureTag >> 16) & 0xFF), ((featureTag >> 24) & 0xFF));
 				}
 			}
-		} else {
+		}
+		else {
 			blog(LOG_INFO, "font_changed: Font does not support any typographic features? %u",
-					featureCount);
+				featureCount);
 		}
 	}
 
@@ -1754,6 +1703,56 @@ static bool font_changed(void* priv, obs_properties_t* props, obs_property_t* p,
 #undef this
 }
 
+static bool weight_changed(void* priv, obs_properties_t* props, obs_property_t* p, obs_data_t* s)
+{
+	if (obs_property_get_type(p) == OBS_PROPERTY_FLOAT) {
+		obs_data_set_int(s, S_FONT_WEIGHT, (int)ceilf(obs_data_get_double(s, S_FONT_WEIGHT "_variable") / 100) * 100);
+	}
+	if (obs_property_get_type(p) == OBS_PROPERTY_LIST) {
+		obs_data_set_double(s, S_FONT_WEIGHT "_variable", obs_data_get_int(s, S_FONT_WEIGHT));
+	}
+	return obs_property_get_type(p) == OBS_PROPERTY_LIST && font_changed(priv, props, p, s);
+}
+
+static int widthToStretch(float width)
+{
+	int best = 0;
+	float bestDiff = fabsf(width - stretchToWidth[0]);
+
+	for (int i = 1; i < 10; i++) {
+		float diff = fabsf(width - stretchToWidth[i]);
+		if (diff < bestDiff) {
+			best = i;
+			bestDiff = diff;
+		}
+	}
+
+	return best;
+}
+
+static bool stretch_changed(void* priv, obs_properties_t* props, obs_property_t* p, obs_data_t* s)
+{
+	if (obs_property_get_type(p) == OBS_PROPERTY_FLOAT) {
+		obs_data_set_int(s, S_FONT_STRETCH, widthToStretch(obs_data_get_double(s, S_FONT_STRETCH "_variable")));
+	}
+	if (obs_property_get_type(p) == OBS_PROPERTY_LIST) {
+		int stretch = obs_data_get_int(s, S_FONT_STRETCH);
+
+		obs_data_set_double(s, S_FONT_STRETCH "_variable", stretchToWidth[(int)stretch]);
+	}
+	return obs_property_get_type(p) == OBS_PROPERTY_LIST && font_changed(priv, props, p, s);
+}
+
+static bool is_standard_axis(DWRITE_FONT_AXIS_TAG tag)
+{
+	// allow adjustment of optical size, we dont really know the 1:1 scale at which text will appear on screen
+	return tag == DWRITE_FONT_AXIS_TAG_WEIGHT ||
+		tag == DWRITE_FONT_AXIS_TAG_WIDTH ||
+		tag == DWRITE_FONT_AXIS_TAG_ITALIC ||
+		tag == DWRITE_FONT_AXIS_TAG_SLANT /*||
+		tag == DWRITE_FONT_AXIS_TAG_OPTICAL_SIZE*/;
+}
+
 static bool outline_changed(obs_properties_t* props, obs_property_t* p, obs_data_t* s)
 {
 	bool outline = obs_data_get_bool(s, S_OUTLINE);
@@ -1766,13 +1765,13 @@ static bool outline_changed(obs_properties_t* props, obs_property_t* p, obs_data
 
 static bool shadow_changed(obs_properties_t* props, obs_property_t* p, obs_data_t* s)
 {
-	bool outline = obs_data_get_bool(s, S_SHADOW);
+	bool shadow = obs_data_get_bool(s, S_SHADOW);
 
-	set_vis(outline, S_SHADOW_RADIUS, true);
-	set_vis(outline, S_SHADOW_COLOR, true);
-	set_vis(outline, S_SHADOW_OFFSET_X, true);
-	set_vis(outline, S_SHADOW_OFFSET_Y, true);
-	set_vis(outline, S_SHADOW_OPACITY, true);
+	set_vis(shadow, S_SHADOW_RADIUS, true);
+	set_vis(shadow, S_SHADOW_COLOR, true);
+	set_vis(shadow, S_SHADOW_OFFSET_X, true);
+	set_vis(shadow, S_SHADOW_OFFSET_Y, true);
+	set_vis(shadow, S_SHADOW_OPACITY, true);
 	return true;
 }
 
@@ -1944,7 +1943,7 @@ static obs_properties_t* get_properties(void* data)
 
 	//obs_properties_add_font(font_group, S_FONT, T_FONT);
 
-	p = obs_properties_add_list(font_group, S_FONT_FACE, "Font Family", OBS_COMBO_TYPE_LIST, OBS_COMBO_FORMAT_STRING);
+	p = obs_properties_add_list(font_group, S_FONT_FACE, T_FONT_FACE, OBS_COMBO_TYPE_LIST, OBS_COMBO_FORMAT_STRING);
 
 	std::vector<std::pair<std::string, std::string>> fonts;
 
@@ -2002,16 +2001,15 @@ static obs_properties_t* get_properties(void* data)
 	obs_property_set_modified_callback2(p, font_changed, s);
 
 	p = obs_properties_add_float(font_group, S_FONT_SIZE, T_FONT_SIZE, 1, 500, 1);
-	obs_property_set_modified_callback(p, weight_changed);
+	obs_property_set_modified_callback2(p, weight_changed, s);
 
 	p = obs_properties_add_float_slider(font_group, S_FONT_WEIGHT "_variable", T_FONT_WEIGHT, S_FONT_WEIGHT_100, S_FONT_WEIGHT_950, 0.1);
-	obs_property_set_modified_callback(p, weight_changed);
+	obs_property_set_modified_callback2(p, weight_changed, s);
 
 	p = obs_properties_add_float_slider(font_group, S_FONT_STRETCH "_variable", T_FONT_STRETCH, S_FONT_STRETCH_ULTRA_CONDENSED, S_FONT_STRETCH_ULTRA_EXPANDED, 0.1);
-	obs_property_set_modified_callback(p, stretch_changed);
+	obs_property_set_modified_callback2(p, stretch_changed, s);
 
-	p = obs_properties_add_list(font_group, S_FONT_WEIGHT, T_FONT_WEIGHT, OBS_COMBO_TYPE_LIST,
-		OBS_COMBO_FORMAT_INT);
+	p = obs_properties_add_list(font_group, S_FONT_WEIGHT, T_FONT_WEIGHT, OBS_COMBO_TYPE_LIST, OBS_COMBO_FORMAT_INT);
 	obs_property_list_add_int(p, T_FONT_WEIGHT_100, S_FONT_WEIGHT_100);
 	obs_property_list_add_int(p, T_FONT_WEIGHT_200, S_FONT_WEIGHT_200);
 	obs_property_list_add_int(p, T_FONT_WEIGHT_300, S_FONT_WEIGHT_300);
@@ -2023,10 +2021,9 @@ static obs_properties_t* get_properties(void* data)
 	obs_property_list_add_int(p, T_FONT_WEIGHT_800, S_FONT_WEIGHT_800);
 	obs_property_list_add_int(p, T_FONT_WEIGHT_900, S_FONT_WEIGHT_900);
 	obs_property_list_add_int(p, T_FONT_WEIGHT_950, S_FONT_WEIGHT_950);
-	obs_property_set_modified_callback(p, weight_changed);
+	obs_property_set_modified_callback2(p, weight_changed, s);
 
-	p = obs_properties_add_list(font_group, S_FONT_STRETCH, T_FONT_STRETCH, OBS_COMBO_TYPE_LIST,
-		OBS_COMBO_FORMAT_INT);
+	p = obs_properties_add_list(font_group, S_FONT_STRETCH, T_FONT_STRETCH, OBS_COMBO_TYPE_LIST, OBS_COMBO_FORMAT_INT);
 	obs_property_list_add_int(p, T_FONT_STRETCH_ULTRA_CONDENSED, S_FONT_STRETCH_ULTRA_CONDENSED);
 	obs_property_list_add_int(p, T_FONT_STRETCH_EXTRA_CONDENSED, S_FONT_STRETCH_EXTRA_CONDENSED);
 	obs_property_list_add_int(p, T_FONT_STRETCH_CONDENSED, S_FONT_STRETCH_CONDENSED);
@@ -2036,17 +2033,15 @@ static obs_properties_t* get_properties(void* data)
 	obs_property_list_add_int(p, T_FONT_STRETCH_EXPANDED, S_FONT_STRETCH_EXPANDED);
 	obs_property_list_add_int(p, T_FONT_STRETCH_EXTRA_EXPANDED, S_FONT_STRETCH_EXTRA_EXPANDED);
 	obs_property_list_add_int(p, T_FONT_STRETCH_ULTRA_EXPANDED, S_FONT_STRETCH_ULTRA_EXPANDED);
-	obs_property_set_modified_callback(p, stretch_changed);
+	obs_property_set_modified_callback2(p, stretch_changed, s);
 
-	p = obs_properties_add_list(font_group, S_FONT_STYLE, T_FONT_STYLE, OBS_COMBO_TYPE_LIST,
-		OBS_COMBO_FORMAT_STRING);
+	p = obs_properties_add_list(font_group, S_FONT_STYLE, T_FONT_STYLE, OBS_COMBO_TYPE_LIST, OBS_COMBO_FORMAT_STRING);
 	obs_property_list_add_string(p, T_FONT_STYLE_NONE, S_FONT_STYLE_NONE);
 	obs_property_list_add_string(p, T_FONT_STYLE_ITALIC, S_FONT_STYLE_ITALIC);
 	obs_property_list_add_string(p, T_FONT_STYLE_OBLIQUE, S_FONT_STYLE_OBLIQUE);
 
 
-	p = obs_properties_add_list(font_group, S_LINE_SPACING, T_LINE_SPACING, OBS_COMBO_TYPE_LIST,
-		OBS_COMBO_FORMAT_INT);
+	p = obs_properties_add_list(font_group, S_LINE_SPACING, T_LINE_SPACING, OBS_COMBO_TYPE_LIST, OBS_COMBO_FORMAT_INT);
 	obs_property_list_add_int(p, T_LINE_SPACING_DEFAULT, S_LINE_SPACING_DEFAULT);
 	obs_property_list_add_int(p, T_LINE_SPACING_UNIFORM, S_LINE_SPACING_UNIFORM);
 	obs_property_set_modified_callback(p, line_spacing_changed);
@@ -2064,8 +2059,7 @@ static obs_properties_t* get_properties(void* data)
 	obs_properties_t* colors_group = obs_properties_create();
 	obs_properties_add_group(props, S_GRADIENT_EX, T_COLOR, OBS_GROUP_NORMAL, colors_group);
 
-	p = obs_properties_add_int_slider(colors_group, S_GRADIENT_EX_COUNT, T_COLORS, 1, MAX_GRADIENT_STOPS,
-		1);
+	p = obs_properties_add_int_slider(colors_group, S_GRADIENT_EX_COUNT, T_COLORS, 1, MAX_GRADIENT_STOPS, 1);
 	obs_property_set_modified_callback(p, gradient_changed);
 
 	for (size_t i = 0; i < MAX_GRADIENT_STOPS; i++) {
@@ -2087,34 +2081,29 @@ static obs_properties_t* get_properties(void* data)
 	obs_properties_t* layout_group = obs_properties_create();
 	obs_properties_add_group(props, S_LAYOUT, T_LAYOUT, OBS_GROUP_NORMAL, layout_group);
 
-	p = obs_properties_add_list(layout_group, S_ALIGN, T_ALIGN, OBS_COMBO_TYPE_LIST,
-		OBS_COMBO_FORMAT_STRING);
+	p = obs_properties_add_list(layout_group, S_ALIGN, T_ALIGN, OBS_COMBO_TYPE_LIST, OBS_COMBO_FORMAT_STRING);
 	obs_property_list_add_string(p, T_ALIGN_LEFT, S_ALIGN_LEFT);
 	obs_property_list_add_string(p, T_ALIGN_CENTER, S_ALIGN_CENTER);
 	obs_property_list_add_string(p, T_ALIGN_RIGHT, S_ALIGN_RIGHT);
 	obs_property_list_add_string(p, T_ALIGN_JUSTIFIED, S_ALIGN_JUSTIFIED);
 
-	p = obs_properties_add_list(layout_group, S_VALIGN, T_VALIGN, OBS_COMBO_TYPE_LIST,
-		OBS_COMBO_FORMAT_STRING);
+	p = obs_properties_add_list(layout_group, S_VALIGN, T_VALIGN, OBS_COMBO_TYPE_LIST, OBS_COMBO_FORMAT_STRING);
 	obs_property_list_add_string(p, T_VALIGN_TOP, S_VALIGN_TOP);
 	obs_property_list_add_string(p, T_VALIGN_CENTER, S_VALIGN_CENTER);
 	obs_property_list_add_string(p, T_VALIGN_BOTTOM, S_VALIGN_BOTTOM);
 
-	p = obs_properties_add_list(layout_group, S_WRAP_MODE, T_WRAP_MODE, OBS_COMBO_TYPE_LIST,
-		OBS_COMBO_FORMAT_STRING);
+	p = obs_properties_add_list(layout_group, S_WRAP_MODE, T_WRAP_MODE, OBS_COMBO_TYPE_LIST, OBS_COMBO_FORMAT_STRING);
 	obs_property_list_add_string(p, T_WRAP_MODE_NONE, S_WRAP_MODE_NONE);
 	obs_property_list_add_string(p, T_WRAP_MODE_WRAP, S_WRAP_MODE_WRAP);
 	obs_property_list_add_string(p, T_WRAP_MODE_WRAP_CHARACTER, S_WRAP_MODE_WRAP_CHARACTER);
 	obs_property_list_add_string(p, T_WRAP_MODE_WRAP_WHOLE_WORDS, S_WRAP_MODE_WRAP_WHOLE_WORDS);
 
-	p = obs_properties_add_list(layout_group, S_TRIMMING, T_TRIMMING, OBS_COMBO_TYPE_LIST,
-		OBS_COMBO_FORMAT_INT);
+	p = obs_properties_add_list(layout_group, S_TRIMMING, T_TRIMMING, OBS_COMBO_TYPE_LIST, OBS_COMBO_FORMAT_INT);
 	obs_property_list_add_int(p, T_TRIMMING_NONE, S_TRIMMING_NONE);
 	obs_property_list_add_int(p, T_TRIMMING_CHARACTER_ELLIPSIS, S_TRIMMING_CHARACTER_ELLIPSIS);
 	obs_property_list_add_int(p, T_TRIMMING_WORD_ELLIPSIS, S_TRIMMING_WORD_ELLIPSIS);
 
-	p = obs_properties_add_list(layout_group, S_TRANSFORM, T_TRANSFORM, OBS_COMBO_TYPE_LIST,
-		OBS_COMBO_FORMAT_INT);
+	p = obs_properties_add_list(layout_group, S_TRANSFORM, T_TRANSFORM, OBS_COMBO_TYPE_LIST, OBS_COMBO_FORMAT_INT);
 	obs_property_list_add_int(p, T_TRANSFORM_NONE, S_TRANSFORM_NONE);
 	obs_property_list_add_int(p, T_TRANSFORM_UPPERCASE, S_TRANSFORM_UPPERCASE);
 	obs_property_list_add_int(p, T_TRANSFORM_LOWERCASE, S_TRANSFORM_LOWERCASE);
@@ -2151,88 +2140,59 @@ static obs_properties_t* get_properties(void* data)
 	obs_properties_add_int_slider(outline_group, S_OUTLINE_OPACITY, T_OUTLINE_OPACITY, 0, 100, 1);
 
 	// Font features group
-	obs_properties_t *feature_group = obs_properties_create();
+	obs_properties_t* feature_group = obs_properties_create();
 	obs_properties_add_group(props, S_FONT_FEATURES, T_FONT_FEATURES, OBS_GROUP_NORMAL, feature_group);
 
 	// Add a boolean property for every DWRITE_FONT_FEATURE_TAG member
-	obs_properties_add_bool(feature_group, S_FONT_FEATURE_ALTERNATIVE_FRACTIONS,
-				T_FONT_FEATURE_ALTERNATIVE_FRACTIONS);
-	obs_properties_add_bool(feature_group, S_FONT_FEATURE_PETITE_CAPITALS_FROM_CAPITALS,
-				T_FONT_FEATURE_PETITE_CAPITALS_FROM_CAPITALS);
-	obs_properties_add_bool(feature_group, S_FONT_FEATURE_SMALL_CAPITALS_FROM_CAPITALS,
-				T_FONT_FEATURE_SMALL_CAPITALS_FROM_CAPITALS);
-	obs_properties_add_bool(feature_group, S_FONT_FEATURE_CONTEXTUAL_ALTERNATES,
-				T_FONT_FEATURE_CONTEXTUAL_ALTERNATES);
-	obs_properties_add_bool(feature_group, S_FONT_FEATURE_CASE_SENSITIVE_FORMS,
-				T_FONT_FEATURE_CASE_SENSITIVE_FORMS);
-	obs_properties_add_bool(feature_group, S_FONT_FEATURE_GLYPH_COMPOSITION_DECOMPOSITION,
-				T_FONT_FEATURE_GLYPH_COMPOSITION_DECOMPOSITION);
-	obs_properties_add_bool(feature_group, S_FONT_FEATURE_CONTEXTUAL_LIGATURES,
-				T_FONT_FEATURE_CONTEXTUAL_LIGATURES);
+	obs_properties_add_bool(feature_group, S_FONT_FEATURE_ALTERNATIVE_FRACTIONS, T_FONT_FEATURE_ALTERNATIVE_FRACTIONS);
+	obs_properties_add_bool(feature_group, S_FONT_FEATURE_PETITE_CAPITALS_FROM_CAPITALS, T_FONT_FEATURE_PETITE_CAPITALS_FROM_CAPITALS);
+	obs_properties_add_bool(feature_group, S_FONT_FEATURE_SMALL_CAPITALS_FROM_CAPITALS, T_FONT_FEATURE_SMALL_CAPITALS_FROM_CAPITALS);
+	obs_properties_add_bool(feature_group, S_FONT_FEATURE_CONTEXTUAL_ALTERNATES, T_FONT_FEATURE_CONTEXTUAL_ALTERNATES);
+	obs_properties_add_bool(feature_group, S_FONT_FEATURE_CASE_SENSITIVE_FORMS, T_FONT_FEATURE_CASE_SENSITIVE_FORMS);
+	obs_properties_add_bool(feature_group, S_FONT_FEATURE_GLYPH_COMPOSITION_DECOMPOSITION, T_FONT_FEATURE_GLYPH_COMPOSITION_DECOMPOSITION);
+	obs_properties_add_bool(feature_group, S_FONT_FEATURE_CONTEXTUAL_LIGATURES, T_FONT_FEATURE_CONTEXTUAL_LIGATURES);
 	obs_properties_add_bool(feature_group, S_FONT_FEATURE_CAPITAL_SPACING, T_FONT_FEATURE_CAPITAL_SPACING);
-	obs_properties_add_bool(feature_group, S_FONT_FEATURE_CONTEXTUAL_SWASH,
-				T_FONT_FEATURE_CONTEXTUAL_SWASH);
-	obs_properties_add_bool(feature_group, S_FONT_FEATURE_CURSIVE_POSITIONING,
-				T_FONT_FEATURE_CURSIVE_POSITIONING);
+	obs_properties_add_bool(feature_group, S_FONT_FEATURE_CONTEXTUAL_SWASH, T_FONT_FEATURE_CONTEXTUAL_SWASH);
+	obs_properties_add_bool(feature_group, S_FONT_FEATURE_CURSIVE_POSITIONING, T_FONT_FEATURE_CURSIVE_POSITIONING);
 	obs_properties_add_bool(feature_group, S_FONT_FEATURE_DEFAULT, T_FONT_FEATURE_DEFAULT);
-	obs_properties_add_bool(feature_group, S_FONT_FEATURE_DISCRETIONARY_LIGATURES,
-				T_FONT_FEATURE_DISCRETIONARY_LIGATURES);
+	obs_properties_add_bool(feature_group, S_FONT_FEATURE_DISCRETIONARY_LIGATURES, T_FONT_FEATURE_DISCRETIONARY_LIGATURES);
 	obs_properties_add_bool(feature_group, S_FONT_FEATURE_EXPERT_FORMS, T_FONT_FEATURE_EXPERT_FORMS);
 	obs_properties_add_bool(feature_group, S_FONT_FEATURE_FRACTIONS, T_FONT_FEATURE_FRACTIONS);
 	obs_properties_add_bool(feature_group, S_FONT_FEATURE_FULL_WIDTH, T_FONT_FEATURE_FULL_WIDTH);
 	obs_properties_add_bool(feature_group, S_FONT_FEATURE_HALF_FORMS, T_FONT_FEATURE_HALF_FORMS);
 	obs_properties_add_bool(feature_group, S_FONT_FEATURE_HALANT_FORMS, T_FONT_FEATURE_HALANT_FORMS);
-	obs_properties_add_bool(feature_group, S_FONT_FEATURE_ALTERNATE_HALF_WIDTH,
-				T_FONT_FEATURE_ALTERNATE_HALF_WIDTH);
-	obs_properties_add_bool(feature_group, S_FONT_FEATURE_HISTORICAL_FORMS,
-				T_FONT_FEATURE_HISTORICAL_FORMS);
-	obs_properties_add_bool(feature_group, S_FONT_FEATURE_HORIZONTAL_KANA_ALTERNATES,
-				T_FONT_FEATURE_HORIZONTAL_KANA_ALTERNATES);
-	obs_properties_add_bool(feature_group, S_FONT_FEATURE_HISTORICAL_LIGATURES,
-				T_FONT_FEATURE_HISTORICAL_LIGATURES);
+	obs_properties_add_bool(feature_group, S_FONT_FEATURE_ALTERNATE_HALF_WIDTH, T_FONT_FEATURE_ALTERNATE_HALF_WIDTH);
+	obs_properties_add_bool(feature_group, S_FONT_FEATURE_HISTORICAL_FORMS, T_FONT_FEATURE_HISTORICAL_FORMS);
+	obs_properties_add_bool(feature_group, S_FONT_FEATURE_HORIZONTAL_KANA_ALTERNATES, T_FONT_FEATURE_HORIZONTAL_KANA_ALTERNATES);
+	obs_properties_add_bool(feature_group, S_FONT_FEATURE_HISTORICAL_LIGATURES, T_FONT_FEATURE_HISTORICAL_LIGATURES);
 	obs_properties_add_bool(feature_group, S_FONT_FEATURE_HALF_WIDTH, T_FONT_FEATURE_HALF_WIDTH);
-	obs_properties_add_bool(feature_group, S_FONT_FEATURE_HOJO_KANJI_FORMS,
-				T_FONT_FEATURE_HOJO_KANJI_FORMS);
+	obs_properties_add_bool(feature_group, S_FONT_FEATURE_HOJO_KANJI_FORMS, T_FONT_FEATURE_HOJO_KANJI_FORMS);
 	obs_properties_add_bool(feature_group, S_FONT_FEATURE_JIS04_FORMS, T_FONT_FEATURE_JIS04_FORMS);
 	obs_properties_add_bool(feature_group, S_FONT_FEATURE_JIS78_FORMS, T_FONT_FEATURE_JIS78_FORMS);
 	obs_properties_add_bool(feature_group, S_FONT_FEATURE_JIS83_FORMS, T_FONT_FEATURE_JIS83_FORMS);
 	obs_properties_add_bool(feature_group, S_FONT_FEATURE_JIS90_FORMS, T_FONT_FEATURE_JIS90_FORMS);
 	obs_properties_add_bool(feature_group, S_FONT_FEATURE_KERNING, T_FONT_FEATURE_KERNING);
-	obs_properties_add_bool(feature_group, S_FONT_FEATURE_STANDARD_LIGATURES,
-				T_FONT_FEATURE_STANDARD_LIGATURES);
+	obs_properties_add_bool(feature_group, S_FONT_FEATURE_STANDARD_LIGATURES, T_FONT_FEATURE_STANDARD_LIGATURES);
 	obs_properties_add_bool(feature_group, S_FONT_FEATURE_LINING_FIGURES, T_FONT_FEATURE_LINING_FIGURES);
 	obs_properties_add_bool(feature_group, S_FONT_FEATURE_LOCALIZED_FORMS, T_FONT_FEATURE_LOCALIZED_FORMS);
-	obs_properties_add_bool(feature_group, S_FONT_FEATURE_MARK_POSITIONING,
-				T_FONT_FEATURE_MARK_POSITIONING);
-	obs_properties_add_bool(feature_group, S_FONT_FEATURE_MATHEMATICAL_GREEK,
-				T_FONT_FEATURE_MATHEMATICAL_GREEK);
-	obs_properties_add_bool(feature_group, S_FONT_FEATURE_MARK_TO_MARK_POSITIONING,
-				T_FONT_FEATURE_MARK_TO_MARK_POSITIONING);
-	obs_properties_add_bool(feature_group, S_FONT_FEATURE_ALTERNATE_ANNOTATION_FORMS,
-				T_FONT_FEATURE_ALTERNATE_ANNOTATION_FORMS);
+	obs_properties_add_bool(feature_group, S_FONT_FEATURE_MARK_POSITIONING, T_FONT_FEATURE_MARK_POSITIONING);
+	obs_properties_add_bool(feature_group, S_FONT_FEATURE_MATHEMATICAL_GREEK, T_FONT_FEATURE_MATHEMATICAL_GREEK);
+	obs_properties_add_bool(feature_group, S_FONT_FEATURE_MARK_TO_MARK_POSITIONING, T_FONT_FEATURE_MARK_TO_MARK_POSITIONING);
+	obs_properties_add_bool(feature_group, S_FONT_FEATURE_ALTERNATE_ANNOTATION_FORMS, T_FONT_FEATURE_ALTERNATE_ANNOTATION_FORMS);
 	obs_properties_add_bool(feature_group, S_FONT_FEATURE_NLC_KANJI_FORMS, T_FONT_FEATURE_NLC_KANJI_FORMS);
-	obs_properties_add_bool(feature_group, S_FONT_FEATURE_OLD_STYLE_FIGURES,
-				T_FONT_FEATURE_OLD_STYLE_FIGURES);
+	obs_properties_add_bool(feature_group, S_FONT_FEATURE_OLD_STYLE_FIGURES, T_FONT_FEATURE_OLD_STYLE_FIGURES);
 	obs_properties_add_bool(feature_group, S_FONT_FEATURE_ORDINALS, T_FONT_FEATURE_ORDINALS);
-	obs_properties_add_bool(feature_group, S_FONT_FEATURE_PROPORTIONAL_ALTERNATE_WIDTH,
-				T_FONT_FEATURE_PROPORTIONAL_ALTERNATE_WIDTH);
+	obs_properties_add_bool(feature_group, S_FONT_FEATURE_PROPORTIONAL_ALTERNATE_WIDTH, T_FONT_FEATURE_PROPORTIONAL_ALTERNATE_WIDTH);
 	obs_properties_add_bool(feature_group, S_FONT_FEATURE_PETITE_CAPITALS, T_FONT_FEATURE_PETITE_CAPITALS);
-	obs_properties_add_bool(feature_group, S_FONT_FEATURE_PROPORTIONAL_FIGURES,
-				T_FONT_FEATURE_PROPORTIONAL_FIGURES);
-	obs_properties_add_bool(feature_group, S_FONT_FEATURE_PROPORTIONAL_WIDTHS,
-				T_FONT_FEATURE_PROPORTIONAL_WIDTHS);
+	obs_properties_add_bool(feature_group, S_FONT_FEATURE_PROPORTIONAL_FIGURES, T_FONT_FEATURE_PROPORTIONAL_FIGURES);
+	obs_properties_add_bool(feature_group, S_FONT_FEATURE_PROPORTIONAL_WIDTHS, T_FONT_FEATURE_PROPORTIONAL_WIDTHS);
 	obs_properties_add_bool(feature_group, S_FONT_FEATURE_QUARTER_WIDTHS, T_FONT_FEATURE_QUARTER_WIDTHS);
-	obs_properties_add_bool(feature_group, S_FONT_FEATURE_REQUIRED_LIGATURES,
-				T_FONT_FEATURE_REQUIRED_LIGATURES);
-	obs_properties_add_bool(feature_group, S_FONT_FEATURE_RUBY_NOTATION_FORMS,
-				T_FONT_FEATURE_RUBY_NOTATION_FORMS);
-	obs_properties_add_bool(feature_group, S_FONT_FEATURE_STYLISTIC_ALTERNATES,
-				T_FONT_FEATURE_STYLISTIC_ALTERNATES);
-	obs_properties_add_bool(feature_group, S_FONT_FEATURE_SCIENTIFIC_INFERIORS,
-				T_FONT_FEATURE_SCIENTIFIC_INFERIORS);
+	obs_properties_add_bool(feature_group, S_FONT_FEATURE_REQUIRED_LIGATURES, T_FONT_FEATURE_REQUIRED_LIGATURES);
+	obs_properties_add_bool(feature_group, S_FONT_FEATURE_RUBY_NOTATION_FORMS, T_FONT_FEATURE_RUBY_NOTATION_FORMS);
+	obs_properties_add_bool(feature_group, S_FONT_FEATURE_STYLISTIC_ALTERNATES, T_FONT_FEATURE_STYLISTIC_ALTERNATES);
+	obs_properties_add_bool(feature_group, S_FONT_FEATURE_SCIENTIFIC_INFERIORS, T_FONT_FEATURE_SCIENTIFIC_INFERIORS);
 	obs_properties_add_bool(feature_group, S_FONT_FEATURE_SMALL_CAPITALS, T_FONT_FEATURE_SMALL_CAPITALS);
-	obs_properties_add_bool(feature_group, S_FONT_FEATURE_SIMPLIFIED_FORMS,
-				T_FONT_FEATURE_SIMPLIFIED_FORMS);
+	obs_properties_add_bool(feature_group, S_FONT_FEATURE_SIMPLIFIED_FORMS, T_FONT_FEATURE_SIMPLIFIED_FORMS);
 	obs_properties_add_bool(feature_group, S_FONT_FEATURE_STYLISTIC_SET_1, T_FONT_FEATURE_STYLISTIC_SET_1);
 	obs_properties_add_bool(feature_group, S_FONT_FEATURE_STYLISTIC_SET_2, T_FONT_FEATURE_STYLISTIC_SET_2);
 	obs_properties_add_bool(feature_group, S_FONT_FEATURE_STYLISTIC_SET_3, T_FONT_FEATURE_STYLISTIC_SET_3);
@@ -2242,43 +2202,28 @@ static obs_properties_t* get_properties(void* data)
 	obs_properties_add_bool(feature_group, S_FONT_FEATURE_STYLISTIC_SET_7, T_FONT_FEATURE_STYLISTIC_SET_7);
 	obs_properties_add_bool(feature_group, S_FONT_FEATURE_STYLISTIC_SET_8, T_FONT_FEATURE_STYLISTIC_SET_8);
 	obs_properties_add_bool(feature_group, S_FONT_FEATURE_STYLISTIC_SET_9, T_FONT_FEATURE_STYLISTIC_SET_9);
-	obs_properties_add_bool(feature_group, S_FONT_FEATURE_STYLISTIC_SET_10,
-				T_FONT_FEATURE_STYLISTIC_SET_10);
-	obs_properties_add_bool(feature_group, S_FONT_FEATURE_STYLISTIC_SET_11,
-				T_FONT_FEATURE_STYLISTIC_SET_11);
-	obs_properties_add_bool(feature_group, S_FONT_FEATURE_STYLISTIC_SET_12,
-				T_FONT_FEATURE_STYLISTIC_SET_12);
-	obs_properties_add_bool(feature_group, S_FONT_FEATURE_STYLISTIC_SET_13,
-				T_FONT_FEATURE_STYLISTIC_SET_13);
-	obs_properties_add_bool(feature_group, S_FONT_FEATURE_STYLISTIC_SET_14,
-				T_FONT_FEATURE_STYLISTIC_SET_14);
-	obs_properties_add_bool(feature_group, S_FONT_FEATURE_STYLISTIC_SET_15,
-				T_FONT_FEATURE_STYLISTIC_SET_15);
-	obs_properties_add_bool(feature_group, S_FONT_FEATURE_STYLISTIC_SET_16,
-				T_FONT_FEATURE_STYLISTIC_SET_16);
-	obs_properties_add_bool(feature_group, S_FONT_FEATURE_STYLISTIC_SET_17,
-				T_FONT_FEATURE_STYLISTIC_SET_17);
-	obs_properties_add_bool(feature_group, S_FONT_FEATURE_STYLISTIC_SET_18,
-				T_FONT_FEATURE_STYLISTIC_SET_18);
-	obs_properties_add_bool(feature_group, S_FONT_FEATURE_STYLISTIC_SET_19,
-				T_FONT_FEATURE_STYLISTIC_SET_19);
-	obs_properties_add_bool(feature_group, S_FONT_FEATURE_STYLISTIC_SET_20,
-				T_FONT_FEATURE_STYLISTIC_SET_20);
+	obs_properties_add_bool(feature_group, S_FONT_FEATURE_STYLISTIC_SET_10, T_FONT_FEATURE_STYLISTIC_SET_10);
+	obs_properties_add_bool(feature_group, S_FONT_FEATURE_STYLISTIC_SET_11, T_FONT_FEATURE_STYLISTIC_SET_11);
+	obs_properties_add_bool(feature_group, S_FONT_FEATURE_STYLISTIC_SET_12, T_FONT_FEATURE_STYLISTIC_SET_12);
+	obs_properties_add_bool(feature_group, S_FONT_FEATURE_STYLISTIC_SET_13, T_FONT_FEATURE_STYLISTIC_SET_13);
+	obs_properties_add_bool(feature_group, S_FONT_FEATURE_STYLISTIC_SET_14, T_FONT_FEATURE_STYLISTIC_SET_14);
+	obs_properties_add_bool(feature_group, S_FONT_FEATURE_STYLISTIC_SET_15, T_FONT_FEATURE_STYLISTIC_SET_15);
+	obs_properties_add_bool(feature_group, S_FONT_FEATURE_STYLISTIC_SET_16, T_FONT_FEATURE_STYLISTIC_SET_16);
+	obs_properties_add_bool(feature_group, S_FONT_FEATURE_STYLISTIC_SET_17, T_FONT_FEATURE_STYLISTIC_SET_17);
+	obs_properties_add_bool(feature_group, S_FONT_FEATURE_STYLISTIC_SET_18, T_FONT_FEATURE_STYLISTIC_SET_18);
+	obs_properties_add_bool(feature_group, S_FONT_FEATURE_STYLISTIC_SET_19, T_FONT_FEATURE_STYLISTIC_SET_19);
+	obs_properties_add_bool(feature_group, S_FONT_FEATURE_STYLISTIC_SET_20, T_FONT_FEATURE_STYLISTIC_SET_20);
 	obs_properties_add_bool(feature_group, S_FONT_FEATURE_SUBSCRIPT, T_FONT_FEATURE_SUBSCRIPT);
 	obs_properties_add_bool(feature_group, S_FONT_FEATURE_SUPERSCRIPT, T_FONT_FEATURE_SUPERSCRIPT);
 	obs_properties_add_bool(feature_group, S_FONT_FEATURE_SWASH, T_FONT_FEATURE_SWASH);
 	obs_properties_add_bool(feature_group, S_FONT_FEATURE_TITLING, T_FONT_FEATURE_TITLING);
-	obs_properties_add_bool(feature_group, S_FONT_FEATURE_TRADITIONAL_NAME_FORMS,
-				T_FONT_FEATURE_TRADITIONAL_NAME_FORMS);
+	obs_properties_add_bool(feature_group, S_FONT_FEATURE_TRADITIONAL_NAME_FORMS, T_FONT_FEATURE_TRADITIONAL_NAME_FORMS);
 	obs_properties_add_bool(feature_group, S_FONT_FEATURE_TABULAR_FIGURES, T_FONT_FEATURE_TABULAR_FIGURES);
-	obs_properties_add_bool(feature_group, S_FONT_FEATURE_TRADITIONAL_FORMS,
-				T_FONT_FEATURE_TRADITIONAL_FORMS);
+	obs_properties_add_bool(feature_group, S_FONT_FEATURE_TRADITIONAL_FORMS, T_FONT_FEATURE_TRADITIONAL_FORMS);
 	obs_properties_add_bool(feature_group, S_FONT_FEATURE_THIRD_WIDTHS, T_FONT_FEATURE_THIRD_WIDTHS);
 	obs_properties_add_bool(feature_group, S_FONT_FEATURE_UNICASE, T_FONT_FEATURE_UNICASE);
-	obs_properties_add_bool(feature_group, S_FONT_FEATURE_VERTICAL_WRITING,
-				T_FONT_FEATURE_VERTICAL_WRITING);
-	obs_properties_add_bool(feature_group, S_FONT_FEATURE_VERTICAL_ALTERNATES_AND_ROTATION,
-				T_FONT_FEATURE_VERTICAL_ALTERNATES_AND_ROTATION);
+	obs_properties_add_bool(feature_group, S_FONT_FEATURE_VERTICAL_WRITING, T_FONT_FEATURE_VERTICAL_WRITING);
+	obs_properties_add_bool(feature_group, S_FONT_FEATURE_VERTICAL_ALTERNATES_AND_ROTATION, T_FONT_FEATURE_VERTICAL_ALTERNATES_AND_ROTATION);
 	obs_properties_add_bool(feature_group, S_FONT_FEATURE_SLASHED_ZERO, T_FONT_FEATURE_SLASHED_ZERO);
 
 	// advanced group
@@ -2340,6 +2285,17 @@ bool obs_module_load(void)
 		obs_data_set_default_int(settings, S_EXTENTS_CY, 100);
 		obs_data_set_default_bool(settings, S_COLOR_FONTS, true);
 		obs_data_set_default_bool(settings, S_ANTIALIASING, true);
+
+		obs_data_set_default_bool(settings, S_FONT_FEATURE_KERNING, true);
+		obs_data_set_default_bool(settings, S_FONT_FEATURE_GLYPH_COMPOSITION_DECOMPOSITION, true);
+		obs_data_set_default_bool(settings, S_FONT_FEATURE_REQUIRED_LIGATURES, true);
+		obs_data_set_default_bool(settings, S_FONT_FEATURE_STANDARD_LIGATURES, true);
+		obs_data_set_default_bool(settings, S_FONT_FEATURE_CONTEXTUAL_LIGATURES, true);
+		obs_data_set_default_bool(settings, S_FONT_FEATURE_CONTEXTUAL_ALTERNATES, true);
+		obs_data_set_default_bool(settings, S_FONT_FEATURE_CURSIVE_POSITIONING, true);
+		obs_data_set_default_bool(settings, S_FONT_FEATURE_MARK_POSITIONING, true);
+		obs_data_set_default_bool(settings, S_FONT_FEATURE_MARK_TO_MARK_POSITIONING, true);
+		obs_data_set_default_bool(settings, S_FONT_FEATURE_LOCALIZED_FORMS, true);
 		};
 	si.update = [](void* data, obs_data_t* settings) {
 		reinterpret_cast<obs_dwrite_text_source*>(data)->Update(settings);

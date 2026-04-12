@@ -246,8 +246,6 @@ public:
 			gs_texture_destroy(textTexture);
 			textTexture = nullptr;
 		}
-
-		release();
 	}
 
 	inline uint32_t get_width()
@@ -270,9 +268,7 @@ private:
 	gradient_axis_t calculate_gradient_axis(float width, float height) const;
 
 	void init_dwrite();
-	void release();
 
-	void update_font();
 	void update_brush(float width, float height);
 	void update_effects();
 	void draw_text();

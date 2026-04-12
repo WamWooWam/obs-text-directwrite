@@ -135,6 +135,9 @@
 // Font features settings group key
 #define S_FONT_FEATURES "font_features"
 
+#define S_OPTICAL_SIZE "variable_prop::opsz"
+#define S_AUTO_OPTICAL_SIZE "variable_prop::opsz::auto"
+
 // Individual font feature setting keys
 #define S_FONT_FEATURE_ALTERNATIVE_FRACTIONS "font_feature_alternative_fractions"
 #define S_FONT_FEATURE_PETITE_CAPITALS_FROM_CAPITALS "font_feature_petite_capitals_from_capitals"
@@ -337,6 +340,8 @@
 
 #define T_FONT_UNDERLINE		T_("Font.Underline")
 #define T_FONT_STRIKETHROUGH	T_("Font.Strikethrough")
+
+#define T_AUTO_OPTICAL_SIZE		T_("Axis.opsz.Auto")
 
 // Font features translation group key
 #define T_FONT_FEATURES T_("FontFeatures")
@@ -631,11 +636,6 @@ void obs_dwrite_text_source::init_dwrite()
 	}
 }
 
-
-void obs_dwrite_text_source::release() {}
-
-void obs_dwrite_text_source::update_font() {}
-
 gradient_axis_t obs_dwrite_text_source::calculate_gradient_axis(float width, float height) const
 {
 	if (width <= 0.0f || height <= 0.0f)
@@ -819,7 +819,7 @@ bool obs_dwrite_text_source::create_text_layout(
 		winrt::com_ptr<IDWriteFontCollection2> fontCollection2
 			= systemFontCollection.as<IDWriteFontCollection2>();
 
-		std::vector<DWRITE_FONT_AXIS_VALUE> axisValues = { variables };
+		std::vector<DWRITE_FONT_AXIS_VALUE> axisValues{ variables };
 
 		winrt::com_ptr<IDWriteFontSet1> fontSet1;
 		winrt::check_hresult(pFactory6->GetSystemFontSet(false, fontSet1.put()));
@@ -1308,12 +1308,14 @@ inline void obs_dwrite_text_source::Update(obs_data_t* s)
 	int32_t new_line_spacing = obs_data_get_int32(s, S_LINE_SPACING);
 	float new_line_spacing_ratio = (float)obs_data_get_double(s, S_LINE_SPACING_RATIO);
 
+	auto new_auto_optical_size = obs_data_get_bool(s, S_AUTO_OPTICAL_SIZE);
+
 	std::vector<DWRITE_FONT_AXIS_VALUE> axis{};
 
 	obs_data_item_t* item = obs_data_first(s);
 	do {
 		std::string name = obs_data_item_get_name(item);
-		if (name.rfind("variable_prop::", 0) != 0) {
+		if (name.rfind("variable_prop::", 0) != 0 || name == S_AUTO_OPTICAL_SIZE) {
 			continue;
 		}
 
@@ -1322,7 +1324,9 @@ inline void obs_dwrite_text_source::Update(obs_data_t* s)
 		DWRITE_FONT_AXIS_VALUE value{};
 		value.axisTag = DWRITE_MAKE_FONT_AXIS_TAG(name[0], name[1], name[2], name[3]);
 		value.value = obs_data_item_get_double(item);
-		axis.push_back(value);
+
+		if (value.axisTag != DWRITE_FONT_AXIS_TAG_OPTICAL_SIZE || !new_auto_optical_size)
+			axis.push_back(value);
 
 		info("property name: %s value: %.1f", name.c_str(), value.value);
 	} while (obs_data_item_next(&item));
@@ -1516,6 +1520,32 @@ MODULE_EXPORT const char* obs_module_description(void)
 
 /* clang-format on */
 
+static inline int width_to_stretch(float width)
+{
+	int best = 0;
+	float bestDiff = fabsf(width - stretchToWidth[0]);
+
+	for (int i = 1; i < 10; i++) {
+		float diff = fabsf(width - stretchToWidth[i]);
+		if (diff < bestDiff) {
+			best = i;
+			bestDiff = diff;
+		}
+	}
+
+	return best;
+}
+
+static inline bool is_standard_axis(DWRITE_FONT_AXIS_TAG tag)
+{
+	// allow adjustment of optical size, we dont really know the 1:1 scale at which text will appear on screen
+	return tag == DWRITE_FONT_AXIS_TAG_WEIGHT ||
+		tag == DWRITE_FONT_AXIS_TAG_WIDTH ||
+		tag == DWRITE_FONT_AXIS_TAG_ITALIC ||
+		tag == DWRITE_FONT_AXIS_TAG_SLANT /*||
+		tag == DWRITE_FONT_AXIS_TAG_OPTICAL_SIZE*/;
+}
+
 static bool use_file_changed(obs_properties_t* props, obs_property_t* p, obs_data_t* s)
 {
 	bool use_file = obs_data_get_bool(s, S_USE_FILE);
@@ -1524,6 +1554,15 @@ static bool use_file_changed(obs_properties_t* props, obs_property_t* p, obs_dat
 	set_vis(use_file, S_FILE, true);
 	return true;
 }
+
+static bool auto_optical_size_changed(obs_properties_t* props, obs_property_t* p, obs_data_t* s)
+{
+	bool auto_size = obs_data_get_bool(s, S_AUTO_OPTICAL_SIZE);
+
+	set_vis(auto_size, S_OPTICAL_SIZE, false);
+	return true;
+}
+
 
 static bool font_changed(void* priv, obs_properties_t* props, obs_property_t* p, obs_data_t* s) {
 
@@ -1677,8 +1716,17 @@ static bool font_changed(void* priv, obs_properties_t* props, obs_property_t* p,
 
 			auto name = ("variable_prop::" + tag);
 
+			if (t == DWRITE_FONT_AXIS_TAG_OPTICAL_SIZE) {
+				auto p = obs_properties_add_bool(variable_group, S_AUTO_OPTICAL_SIZE, T_AUTO_OPTICAL_SIZE);
+				obs_property_set_modified_callback(p, auto_optical_size_changed);
+			}
+
 			obs_data_set_double(s, name.c_str(), current);
-			obs_properties_add_float_slider(variable_group, name.c_str(), displayName.c_str(), minVal, maxVal, 0.1);
+			auto slider = obs_properties_add_float_slider(variable_group, name.c_str(), displayName.c_str(), minVal, maxVal, 0.1);
+
+			if (t == DWRITE_FONT_AXIS_TAG_OPTICAL_SIZE) {
+				obs_property_set_visible(slider, !obs_data_get_bool(s, S_AUTO_OPTICAL_SIZE));
+			}
 		}
 
 		src->has_variables = true;
@@ -1705,52 +1753,29 @@ static bool font_changed(void* priv, obs_properties_t* props, obs_property_t* p,
 
 static bool weight_changed(void* priv, obs_properties_t* props, obs_property_t* p, obs_data_t* s)
 {
-	if (obs_property_get_type(p) == OBS_PROPERTY_FLOAT) {
+	auto has_variables = obs_data_get_bool(s, S_HAS_VARIABLES);
+	if (has_variables) {
 		obs_data_set_int(s, S_FONT_WEIGHT, (int)ceilf(obs_data_get_double(s, S_FONT_WEIGHT "_variable") / 100) * 100);
+		return false;
 	}
-	if (obs_property_get_type(p) == OBS_PROPERTY_LIST) {
+	else {
 		obs_data_set_double(s, S_FONT_WEIGHT "_variable", obs_data_get_int(s, S_FONT_WEIGHT));
+		return font_changed(priv, props, p, s);;
 	}
-	return obs_property_get_type(p) == OBS_PROPERTY_LIST && font_changed(priv, props, p, s);
-}
-
-static int widthToStretch(float width)
-{
-	int best = 0;
-	float bestDiff = fabsf(width - stretchToWidth[0]);
-
-	for (int i = 1; i < 10; i++) {
-		float diff = fabsf(width - stretchToWidth[i]);
-		if (diff < bestDiff) {
-			best = i;
-			bestDiff = diff;
-		}
-	}
-
-	return best;
 }
 
 static bool stretch_changed(void* priv, obs_properties_t* props, obs_property_t* p, obs_data_t* s)
 {
-	if (obs_property_get_type(p) == OBS_PROPERTY_FLOAT) {
-		obs_data_set_int(s, S_FONT_STRETCH, widthToStretch(obs_data_get_double(s, S_FONT_STRETCH "_variable")));
+	auto has_variables = obs_data_get_bool(s, S_HAS_VARIABLES);
+	if (has_variables) {
+		obs_data_set_int(s, S_FONT_STRETCH, width_to_stretch(obs_data_get_double(s, S_FONT_STRETCH "_variable")));
+		return false;
 	}
-	if (obs_property_get_type(p) == OBS_PROPERTY_LIST) {
+	else {
 		int stretch = obs_data_get_int(s, S_FONT_STRETCH);
-
 		obs_data_set_double(s, S_FONT_STRETCH "_variable", stretchToWidth[(int)stretch]);
+		return font_changed(priv, props, p, s);;
 	}
-	return obs_property_get_type(p) == OBS_PROPERTY_LIST && font_changed(priv, props, p, s);
-}
-
-static bool is_standard_axis(DWRITE_FONT_AXIS_TAG tag)
-{
-	// allow adjustment of optical size, we dont really know the 1:1 scale at which text will appear on screen
-	return tag == DWRITE_FONT_AXIS_TAG_WEIGHT ||
-		tag == DWRITE_FONT_AXIS_TAG_WIDTH ||
-		tag == DWRITE_FONT_AXIS_TAG_ITALIC ||
-		tag == DWRITE_FONT_AXIS_TAG_SLANT /*||
-		tag == DWRITE_FONT_AXIS_TAG_OPTICAL_SIZE*/;
 }
 
 static bool outline_changed(obs_properties_t* props, obs_property_t* p, obs_data_t* s)
@@ -2296,6 +2321,8 @@ bool obs_module_load(void)
 		obs_data_set_default_bool(settings, S_FONT_FEATURE_MARK_POSITIONING, true);
 		obs_data_set_default_bool(settings, S_FONT_FEATURE_MARK_TO_MARK_POSITIONING, true);
 		obs_data_set_default_bool(settings, S_FONT_FEATURE_LOCALIZED_FORMS, true);
+
+		obs_data_set_default_bool(settings, S_AUTO_OPTICAL_SIZE, true);
 		};
 	si.update = [](void* data, obs_data_t* settings) {
 		reinterpret_cast<obs_dwrite_text_source*>(data)->Update(settings);

@@ -1,6 +1,8 @@
 
 #include "obs_text_directwrite.h"
 
+#include <set>
+
 /* ------------------------------------------------------------------------- */
 
 #define S_FONT "font"
@@ -130,7 +132,91 @@
 #define S_FONT_UNDERLINE "underline"
 #define S_FONT_STRIKETHROUGH "strikethrough"
 
-#define S_TABULAR_FIGURES "tabular_figures"
+// Font features settings group key
+#define S_FONT_FEATURES "font_features"
+
+// Individual font feature setting keys
+#define S_FONT_FEATURE_ALTERNATIVE_FRACTIONS "font_feature_alternative_fractions"
+#define S_FONT_FEATURE_PETITE_CAPITALS_FROM_CAPITALS "font_feature_petite_capitals_from_capitals"
+#define S_FONT_FEATURE_SMALL_CAPITALS_FROM_CAPITALS "font_feature_small_capitals_from_capitals"
+#define S_FONT_FEATURE_CONTEXTUAL_ALTERNATES "font_feature_contextual_alternates"
+#define S_FONT_FEATURE_CASE_SENSITIVE_FORMS "font_feature_case_sensitive_forms"
+#define S_FONT_FEATURE_GLYPH_COMPOSITION_DECOMPOSITION "font_feature_glyph_composition_decomposition"
+#define S_FONT_FEATURE_CONTEXTUAL_LIGATURES "font_feature_contextual_ligatures"
+#define S_FONT_FEATURE_CAPITAL_SPACING "font_feature_capital_spacing"
+#define S_FONT_FEATURE_CONTEXTUAL_SWASH "font_feature_contextual_swash"
+#define S_FONT_FEATURE_CURSIVE_POSITIONING "font_feature_cursive_positioning"
+#define S_FONT_FEATURE_DEFAULT "font_feature_default"
+#define S_FONT_FEATURE_DISCRETIONARY_LIGATURES "font_feature_discretionary_ligatures"
+#define S_FONT_FEATURE_EXPERT_FORMS "font_feature_expert_forms"
+#define S_FONT_FEATURE_FRACTIONS "font_feature_fractions"
+#define S_FONT_FEATURE_FULL_WIDTH "font_feature_full_width"
+#define S_FONT_FEATURE_HALF_FORMS "font_feature_half_forms"
+#define S_FONT_FEATURE_HALANT_FORMS "font_feature_halant_forms"
+#define S_FONT_FEATURE_ALTERNATE_HALF_WIDTH "font_feature_alternate_half_width"
+#define S_FONT_FEATURE_HISTORICAL_FORMS "font_feature_historical_forms"
+#define S_FONT_FEATURE_HORIZONTAL_KANA_ALTERNATES "font_feature_horizontal_kana_alternates"
+#define S_FONT_FEATURE_HISTORICAL_LIGATURES "font_feature_historical_ligatures"
+#define S_FONT_FEATURE_HALF_WIDTH "font_feature_half_width"
+#define S_FONT_FEATURE_HOJO_KANJI_FORMS "font_feature_hojo_kanji_forms"
+#define S_FONT_FEATURE_JIS04_FORMS "font_feature_jis04_forms"
+#define S_FONT_FEATURE_JIS78_FORMS "font_feature_jis78_forms"
+#define S_FONT_FEATURE_JIS83_FORMS "font_feature_jis83_forms"
+#define S_FONT_FEATURE_JIS90_FORMS "font_feature_jis90_forms"
+#define S_FONT_FEATURE_KERNING "font_feature_kerning"
+#define S_FONT_FEATURE_STANDARD_LIGATURES "font_feature_standard_ligatures"
+#define S_FONT_FEATURE_LINING_FIGURES "font_feature_lining_figures"
+#define S_FONT_FEATURE_LOCALIZED_FORMS "font_feature_localized_forms"
+#define S_FONT_FEATURE_MARK_POSITIONING "font_feature_mark_positioning"
+#define S_FONT_FEATURE_MATHEMATICAL_GREEK "font_feature_mathematical_greek"
+#define S_FONT_FEATURE_MARK_TO_MARK_POSITIONING "font_feature_mark_to_mark_positioning"
+#define S_FONT_FEATURE_ALTERNATE_ANNOTATION_FORMS "font_feature_alternate_annotation_forms"
+#define S_FONT_FEATURE_NLC_KANJI_FORMS "font_feature_nlc_kanji_forms"
+#define S_FONT_FEATURE_OLD_STYLE_FIGURES "font_feature_old_style_figures"
+#define S_FONT_FEATURE_ORDINALS "font_feature_ordinals"
+#define S_FONT_FEATURE_PROPORTIONAL_ALTERNATE_WIDTH "font_feature_proportional_alternate_width"
+#define S_FONT_FEATURE_PETITE_CAPITALS "font_feature_petite_capitals"
+#define S_FONT_FEATURE_PROPORTIONAL_FIGURES "font_feature_proportional_figures"
+#define S_FONT_FEATURE_PROPORTIONAL_WIDTHS "font_feature_proportional_widths"
+#define S_FONT_FEATURE_QUARTER_WIDTHS "font_feature_quarter_widths"
+#define S_FONT_FEATURE_REQUIRED_LIGATURES "font_feature_required_ligatures"
+#define S_FONT_FEATURE_RUBY_NOTATION_FORMS "font_feature_ruby_notation_forms"
+#define S_FONT_FEATURE_STYLISTIC_ALTERNATES "font_feature_stylistic_alternates"
+#define S_FONT_FEATURE_SCIENTIFIC_INFERIORS "font_feature_scientific_inferiors"
+#define S_FONT_FEATURE_SMALL_CAPITALS "font_feature_small_capitals"
+#define S_FONT_FEATURE_SIMPLIFIED_FORMS "font_feature_simplified_forms"
+#define S_FONT_FEATURE_STYLISTIC_SET_1 "font_feature_stylistic_set_1"
+#define S_FONT_FEATURE_STYLISTIC_SET_2 "font_feature_stylistic_set_2"
+#define S_FONT_FEATURE_STYLISTIC_SET_3 "font_feature_stylistic_set_3"
+#define S_FONT_FEATURE_STYLISTIC_SET_4 "font_feature_stylistic_set_4"
+#define S_FONT_FEATURE_STYLISTIC_SET_5 "font_feature_stylistic_set_5"
+#define S_FONT_FEATURE_STYLISTIC_SET_6 "font_feature_stylistic_set_6"
+#define S_FONT_FEATURE_STYLISTIC_SET_7 "font_feature_stylistic_set_7"
+#define S_FONT_FEATURE_STYLISTIC_SET_8 "font_feature_stylistic_set_8"
+#define S_FONT_FEATURE_STYLISTIC_SET_9 "font_feature_stylistic_set_9"
+#define S_FONT_FEATURE_STYLISTIC_SET_10 "font_feature_stylistic_set_10"
+#define S_FONT_FEATURE_STYLISTIC_SET_11 "font_feature_stylistic_set_11"
+#define S_FONT_FEATURE_STYLISTIC_SET_12 "font_feature_stylistic_set_12"
+#define S_FONT_FEATURE_STYLISTIC_SET_13 "font_feature_stylistic_set_13"
+#define S_FONT_FEATURE_STYLISTIC_SET_14 "font_feature_stylistic_set_14"
+#define S_FONT_FEATURE_STYLISTIC_SET_15 "font_feature_stylistic_set_15"
+#define S_FONT_FEATURE_STYLISTIC_SET_16 "font_feature_stylistic_set_16"
+#define S_FONT_FEATURE_STYLISTIC_SET_17 "font_feature_stylistic_set_17"
+#define S_FONT_FEATURE_STYLISTIC_SET_18 "font_feature_stylistic_set_18"
+#define S_FONT_FEATURE_STYLISTIC_SET_19 "font_feature_stylistic_set_19"
+#define S_FONT_FEATURE_STYLISTIC_SET_20 "font_feature_stylistic_set_20"
+#define S_FONT_FEATURE_SUBSCRIPT "font_feature_subscript"
+#define S_FONT_FEATURE_SUPERSCRIPT "font_feature_superscript"
+#define S_FONT_FEATURE_SWASH "font_feature_swash"
+#define S_FONT_FEATURE_TITLING "font_feature_titling"
+#define S_FONT_FEATURE_TRADITIONAL_NAME_FORMS "font_feature_traditional_name_forms"
+#define S_FONT_FEATURE_TABULAR_FIGURES "font_feature_tabular_figures"
+#define S_FONT_FEATURE_TRADITIONAL_FORMS "font_feature_traditional_forms"
+#define S_FONT_FEATURE_THIRD_WIDTHS "font_feature_third_widths"
+#define S_FONT_FEATURE_UNICASE "font_feature_unicase"
+#define S_FONT_FEATURE_VERTICAL_WRITING "font_feature_vertical_writing"
+#define S_FONT_FEATURE_VERTICAL_ALTERNATES_AND_ROTATION "font_feature_vertical_alternates_and_rotation"
+#define S_FONT_FEATURE_SLASHED_ZERO "font_feature_slashed_zero"
 
 #define S_ADVANCED "advanced"
 
@@ -251,7 +337,91 @@
 #define T_FONT_UNDERLINE		T_("Font.Underline")
 #define T_FONT_STRIKETHROUGH	T_("Font.Strikethrough")
 
-#define T_TABULAR_FIGURES		T_("FontFeature.TabularFigures")
+// Font features translation group key
+#define T_FONT_FEATURES T_("FontFeatures")
+
+// Individual font feature translation keys
+#define T_FONT_FEATURE_ALTERNATIVE_FRACTIONS T_("FontFeature.AlternativeFractions")
+#define T_FONT_FEATURE_PETITE_CAPITALS_FROM_CAPITALS T_("FontFeature.PetiteCapitalsFromCapitals")
+#define T_FONT_FEATURE_SMALL_CAPITALS_FROM_CAPITALS T_("FontFeature.SmallCapitalsFromCapitals")
+#define T_FONT_FEATURE_CONTEXTUAL_ALTERNATES T_("FontFeature.ContextualAlternates")
+#define T_FONT_FEATURE_CASE_SENSITIVE_FORMS T_("FontFeature.CaseSensitiveForms")
+#define T_FONT_FEATURE_GLYPH_COMPOSITION_DECOMPOSITION T_("FontFeature.GlyphCompositionDecomposition")
+#define T_FONT_FEATURE_CONTEXTUAL_LIGATURES T_("FontFeature.ContextualLigatures")
+#define T_FONT_FEATURE_CAPITAL_SPACING T_("FontFeature.CapitalSpacing")
+#define T_FONT_FEATURE_CONTEXTUAL_SWASH T_("FontFeature.ContextualSwash")
+#define T_FONT_FEATURE_CURSIVE_POSITIONING T_("FontFeature.CursivePositioning")
+#define T_FONT_FEATURE_DEFAULT T_("FontFeature.Default")
+#define T_FONT_FEATURE_DISCRETIONARY_LIGATURES T_("FontFeature.DiscretionaryLigatures")
+#define T_FONT_FEATURE_EXPERT_FORMS T_("FontFeature.ExpertForms")
+#define T_FONT_FEATURE_FRACTIONS T_("FontFeature.Fractions")
+#define T_FONT_FEATURE_FULL_WIDTH T_("FontFeature.FullWidth")
+#define T_FONT_FEATURE_HALF_FORMS T_("FontFeature.HalfForms")
+#define T_FONT_FEATURE_HALANT_FORMS T_("FontFeature.HalantForms")
+#define T_FONT_FEATURE_ALTERNATE_HALF_WIDTH T_("FontFeature.AlternateHalfWidth")
+#define T_FONT_FEATURE_HISTORICAL_FORMS T_("FontFeature.HistoricalForms")
+#define T_FONT_FEATURE_HORIZONTAL_KANA_ALTERNATES T_("FontFeature.HorizontalKanaAlternates")
+#define T_FONT_FEATURE_HISTORICAL_LIGATURES T_("FontFeature.HistoricalLigatures")
+#define T_FONT_FEATURE_HALF_WIDTH T_("FontFeature.HalfWidth")
+#define T_FONT_FEATURE_HOJO_KANJI_FORMS T_("FontFeature.HojoKanjiForms")
+#define T_FONT_FEATURE_JIS04_FORMS T_("FontFeature.JIS04Forms")
+#define T_FONT_FEATURE_JIS78_FORMS T_("FontFeature.JIS78Forms")
+#define T_FONT_FEATURE_JIS83_FORMS T_("FontFeature.JIS83Forms")
+#define T_FONT_FEATURE_JIS90_FORMS T_("FontFeature.JIS90Forms")
+#define T_FONT_FEATURE_KERNING T_("FontFeature.Kerning")
+#define T_FONT_FEATURE_STANDARD_LIGATURES T_("FontFeature.StandardLigatures")
+#define T_FONT_FEATURE_LINING_FIGURES T_("FontFeature.LiningFigures")
+#define T_FONT_FEATURE_LOCALIZED_FORMS T_("FontFeature.LocalizedForms")
+#define T_FONT_FEATURE_MARK_POSITIONING T_("FontFeature.MarkPositioning")
+#define T_FONT_FEATURE_MATHEMATICAL_GREEK T_("FontFeature.MathematicalGreek")
+#define T_FONT_FEATURE_MARK_TO_MARK_POSITIONING T_("FontFeature.MarkToMarkPositioning")
+#define T_FONT_FEATURE_ALTERNATE_ANNOTATION_FORMS T_("FontFeature.AlternateAnnotationForms")
+#define T_FONT_FEATURE_NLC_KANJI_FORMS T_("FontFeature.NLCKanjiForms")
+#define T_FONT_FEATURE_OLD_STYLE_FIGURES T_("FontFeature.OldStyleFigures")
+#define T_FONT_FEATURE_ORDINALS T_("FontFeature.Ordinals")
+#define T_FONT_FEATURE_PROPORTIONAL_ALTERNATE_WIDTH T_("FontFeature.ProportionalAlternateWidth")
+#define T_FONT_FEATURE_PETITE_CAPITALS T_("FontFeature.PetiteCapitals")
+#define T_FONT_FEATURE_PROPORTIONAL_FIGURES T_("FontFeature.ProportionalFigures")
+#define T_FONT_FEATURE_PROPORTIONAL_WIDTHS T_("FontFeature.ProportionalWidths")
+#define T_FONT_FEATURE_QUARTER_WIDTHS T_("FontFeature.QuarterWidths")
+#define T_FONT_FEATURE_REQUIRED_LIGATURES T_("FontFeature.RequiredLigatures")
+#define T_FONT_FEATURE_RUBY_NOTATION_FORMS T_("FontFeature.RubyNotationForms")
+#define T_FONT_FEATURE_STYLISTIC_ALTERNATES T_("FontFeature.StylisticAlternates")
+#define T_FONT_FEATURE_SCIENTIFIC_INFERIORS T_("FontFeature.ScientificInferiors")
+#define T_FONT_FEATURE_SMALL_CAPITALS T_("FontFeature.SmallCapitals")
+#define T_FONT_FEATURE_SIMPLIFIED_FORMS T_("FontFeature.SimplifiedForms")
+#define T_FONT_FEATURE_STYLISTIC_SET_1 T_("FontFeature.StylisticSet1")
+#define T_FONT_FEATURE_STYLISTIC_SET_2 T_("FontFeature.StylisticSet2")
+#define T_FONT_FEATURE_STYLISTIC_SET_3 T_("FontFeature.StylisticSet3")
+#define T_FONT_FEATURE_STYLISTIC_SET_4 T_("FontFeature.StylisticSet4")
+#define T_FONT_FEATURE_STYLISTIC_SET_5 T_("FontFeature.StylisticSet5")
+#define T_FONT_FEATURE_STYLISTIC_SET_6 T_("FontFeature.StylisticSet6")
+#define T_FONT_FEATURE_STYLISTIC_SET_7 T_("FontFeature.StylisticSet7")
+#define T_FONT_FEATURE_STYLISTIC_SET_8 T_("FontFeature.StylisticSet8")
+#define T_FONT_FEATURE_STYLISTIC_SET_9 T_("FontFeature.StylisticSet9")
+#define T_FONT_FEATURE_STYLISTIC_SET_10 T_("FontFeature.StylisticSet10")
+#define T_FONT_FEATURE_STYLISTIC_SET_11 T_("FontFeature.StylisticSet11")
+#define T_FONT_FEATURE_STYLISTIC_SET_12 T_("FontFeature.StylisticSet12")
+#define T_FONT_FEATURE_STYLISTIC_SET_13 T_("FontFeature.StylisticSet13")
+#define T_FONT_FEATURE_STYLISTIC_SET_14 T_("FontFeature.StylisticSet14")
+#define T_FONT_FEATURE_STYLISTIC_SET_15 T_("FontFeature.StylisticSet15")
+#define T_FONT_FEATURE_STYLISTIC_SET_16 T_("FontFeature.StylisticSet16")
+#define T_FONT_FEATURE_STYLISTIC_SET_17 T_("FontFeature.StylisticSet17")
+#define T_FONT_FEATURE_STYLISTIC_SET_18 T_("FontFeature.StylisticSet18")
+#define T_FONT_FEATURE_STYLISTIC_SET_19 T_("FontFeature.StylisticSet19")
+#define T_FONT_FEATURE_STYLISTIC_SET_20 T_("FontFeature.StylisticSet20")
+#define T_FONT_FEATURE_SUBSCRIPT T_("FontFeature.Subscript")
+#define T_FONT_FEATURE_SUPERSCRIPT T_("FontFeature.Superscript")
+#define T_FONT_FEATURE_SWASH T_("FontFeature.Swash")
+#define T_FONT_FEATURE_TITLING T_("FontFeature.Titling")
+#define T_FONT_FEATURE_TRADITIONAL_NAME_FORMS T_("FontFeature.TraditionalNameForms")
+#define T_FONT_FEATURE_TABULAR_FIGURES T_("FontFeature.TabularFigures")
+#define T_FONT_FEATURE_TRADITIONAL_FORMS T_("FontFeature.TraditionalForms")
+#define T_FONT_FEATURE_THIRD_WIDTHS T_("FontFeature.ThirdWidths")
+#define T_FONT_FEATURE_UNICASE T_("FontFeature.Unicase")
+#define T_FONT_FEATURE_VERTICAL_WRITING T_("FontFeature.VerticalWriting")
+#define T_FONT_FEATURE_VERTICAL_ALTERNATES_AND_ROTATION T_("FontFeature.VerticalAlternatesAndRotation")
+#define T_FONT_FEATURE_SLASHED_ZERO T_("FontFeature.SlashedZero")
 
 #define T_HTML T_("Html")
 
@@ -276,6 +446,108 @@ static const float stretchToWidth[] = {
 	150.0f,  // extra-expanded
 	200.0f,  // ultra-expanded
 };
+
+static const std::set<font_feature_tag, std::less<>>
+	font_feature_set = {
+	{"font_feature_alternative_fractions", DWRITE_FONT_FEATURE_TAG_ALTERNATIVE_FRACTIONS},
+	{"font_feature_petite_capitals_from_capitals", DWRITE_FONT_FEATURE_TAG_PETITE_CAPITALS_FROM_CAPITALS},
+	{"font_feature_small_capitals_from_capitals", DWRITE_FONT_FEATURE_TAG_SMALL_CAPITALS_FROM_CAPITALS},
+	{"font_feature_contextual_alternates", DWRITE_FONT_FEATURE_TAG_CONTEXTUAL_ALTERNATES},
+	{"font_feature_case_sensitive_forms", DWRITE_FONT_FEATURE_TAG_CASE_SENSITIVE_FORMS},
+	{"font_feature_glyph_composition_decomposition",
+	 DWRITE_FONT_FEATURE_TAG_GLYPH_COMPOSITION_DECOMPOSITION},
+	{"font_feature_contextual_ligatures", DWRITE_FONT_FEATURE_TAG_CONTEXTUAL_LIGATURES},
+	{"font_feature_capital_spacing", DWRITE_FONT_FEATURE_TAG_CAPITAL_SPACING},
+	{"font_feature_contextual_swash", DWRITE_FONT_FEATURE_TAG_CONTEXTUAL_SWASH},
+	{"font_feature_cursive_positioning", DWRITE_FONT_FEATURE_TAG_CURSIVE_POSITIONING},
+	{"font_feature_default", DWRITE_FONT_FEATURE_TAG_DEFAULT},
+	{"font_feature_discretionary_ligatures", DWRITE_FONT_FEATURE_TAG_DISCRETIONARY_LIGATURES},
+	{"font_feature_expert_forms", DWRITE_FONT_FEATURE_TAG_EXPERT_FORMS},
+	{"font_feature_fractions", DWRITE_FONT_FEATURE_TAG_FRACTIONS},
+	{"font_feature_full_width", DWRITE_FONT_FEATURE_TAG_FULL_WIDTH},
+	{"font_feature_half_forms", DWRITE_FONT_FEATURE_TAG_HALF_FORMS},
+	{"font_feature_halant_forms", DWRITE_FONT_FEATURE_TAG_HALANT_FORMS},
+	{"font_feature_alternate_half_width", DWRITE_FONT_FEATURE_TAG_ALTERNATE_HALF_WIDTH},
+	{"font_feature_historical_forms", DWRITE_FONT_FEATURE_TAG_HISTORICAL_FORMS},
+	{"font_feature_horizontal_kana_alternates", DWRITE_FONT_FEATURE_TAG_HORIZONTAL_KANA_ALTERNATES},
+	{"font_feature_historical_ligatures", DWRITE_FONT_FEATURE_TAG_HISTORICAL_LIGATURES},
+	{"font_feature_half_width", DWRITE_FONT_FEATURE_TAG_HALF_WIDTH},
+	{"font_feature_hojo_kanji_forms", DWRITE_FONT_FEATURE_TAG_HOJO_KANJI_FORMS},
+	{"font_feature_jis04_forms", DWRITE_FONT_FEATURE_TAG_JIS04_FORMS},
+	{"font_feature_jis78_forms", DWRITE_FONT_FEATURE_TAG_JIS78_FORMS},
+	{"font_feature_jis83_forms", DWRITE_FONT_FEATURE_TAG_JIS83_FORMS},
+	{"font_feature_jis90_forms", DWRITE_FONT_FEATURE_TAG_JIS90_FORMS},
+	{"font_feature_kerning", DWRITE_FONT_FEATURE_TAG_KERNING},
+	{"font_feature_standard_ligatures", DWRITE_FONT_FEATURE_TAG_STANDARD_LIGATURES},
+	{"font_feature_lining_figures", DWRITE_FONT_FEATURE_TAG_LINING_FIGURES},
+	{"font_feature_localized_forms", DWRITE_FONT_FEATURE_TAG_LOCALIZED_FORMS},
+	{"font_feature_mark_positioning", DWRITE_FONT_FEATURE_TAG_MARK_POSITIONING},
+	{"font_feature_mathematical_greek", DWRITE_FONT_FEATURE_TAG_MATHEMATICAL_GREEK},
+	{"font_feature_mark_to_mark_positioning", DWRITE_FONT_FEATURE_TAG_MARK_TO_MARK_POSITIONING},
+	{"font_feature_alternate_annotation_forms", DWRITE_FONT_FEATURE_TAG_ALTERNATE_ANNOTATION_FORMS},
+	{"font_feature_nlc_kanji_forms", DWRITE_FONT_FEATURE_TAG_NLC_KANJI_FORMS},
+	{"font_feature_old_style_figures", DWRITE_FONT_FEATURE_TAG_OLD_STYLE_FIGURES},
+	{"font_feature_ordinals", DWRITE_FONT_FEATURE_TAG_ORDINALS},
+	{"font_feature_proportional_alternate_width", DWRITE_FONT_FEATURE_TAG_PROPORTIONAL_ALTERNATE_WIDTH},
+	{"font_feature_petite_capitals", DWRITE_FONT_FEATURE_TAG_PETITE_CAPITALS},
+	{"font_feature_proportional_figures", DWRITE_FONT_FEATURE_TAG_PROPORTIONAL_FIGURES},
+	{"font_feature_proportional_widths", DWRITE_FONT_FEATURE_TAG_PROPORTIONAL_WIDTHS},
+	{"font_feature_quarter_widths", DWRITE_FONT_FEATURE_TAG_QUARTER_WIDTHS},
+	{"font_feature_required_ligatures", DWRITE_FONT_FEATURE_TAG_REQUIRED_LIGATURES},
+	{"font_feature_ruby_notation_forms", DWRITE_FONT_FEATURE_TAG_RUBY_NOTATION_FORMS},
+	{"font_feature_stylistic_alternates", DWRITE_FONT_FEATURE_TAG_STYLISTIC_ALTERNATES},
+	{"font_feature_scientific_inferiors", DWRITE_FONT_FEATURE_TAG_SCIENTIFIC_INFERIORS},
+	{"font_feature_small_capitals", DWRITE_FONT_FEATURE_TAG_SMALL_CAPITALS},
+	{"font_feature_simplified_forms", DWRITE_FONT_FEATURE_TAG_SIMPLIFIED_FORMS},
+	{"font_feature_stylistic_set_1", DWRITE_FONT_FEATURE_TAG_STYLISTIC_SET_1},
+	{"font_feature_stylistic_set_2", DWRITE_FONT_FEATURE_TAG_STYLISTIC_SET_2},
+	{"font_feature_stylistic_set_3", DWRITE_FONT_FEATURE_TAG_STYLISTIC_SET_3},
+	{"font_feature_stylistic_set_4", DWRITE_FONT_FEATURE_TAG_STYLISTIC_SET_4},
+	{"font_feature_stylistic_set_5", DWRITE_FONT_FEATURE_TAG_STYLISTIC_SET_5},
+	{"font_feature_stylistic_set_6", DWRITE_FONT_FEATURE_TAG_STYLISTIC_SET_6},
+	{"font_feature_stylistic_set_7", DWRITE_FONT_FEATURE_TAG_STYLISTIC_SET_7},
+	{"font_feature_stylistic_set_8", DWRITE_FONT_FEATURE_TAG_STYLISTIC_SET_8},
+	{"font_feature_stylistic_set_9", DWRITE_FONT_FEATURE_TAG_STYLISTIC_SET_9},
+	{"font_feature_stylistic_set_10", DWRITE_FONT_FEATURE_TAG_STYLISTIC_SET_10},
+	{"font_feature_stylistic_set_11", DWRITE_FONT_FEATURE_TAG_STYLISTIC_SET_11},
+	{"font_feature_stylistic_set_12", DWRITE_FONT_FEATURE_TAG_STYLISTIC_SET_12},
+	{"font_feature_stylistic_set_13", DWRITE_FONT_FEATURE_TAG_STYLISTIC_SET_13},
+	{"font_feature_stylistic_set_14", DWRITE_FONT_FEATURE_TAG_STYLISTIC_SET_14},
+	{"font_feature_stylistic_set_15", DWRITE_FONT_FEATURE_TAG_STYLISTIC_SET_15},
+	{"font_feature_stylistic_set_16", DWRITE_FONT_FEATURE_TAG_STYLISTIC_SET_16},
+	{"font_feature_stylistic_set_17", DWRITE_FONT_FEATURE_TAG_STYLISTIC_SET_17},
+	{"font_feature_stylistic_set_18", DWRITE_FONT_FEATURE_TAG_STYLISTIC_SET_18},
+	{"font_feature_stylistic_set_19", DWRITE_FONT_FEATURE_TAG_STYLISTIC_SET_19},
+	{"font_feature_stylistic_set_20", DWRITE_FONT_FEATURE_TAG_STYLISTIC_SET_20},
+	{"font_feature_subscript", DWRITE_FONT_FEATURE_TAG_SUBSCRIPT},
+	{"font_feature_superscript", DWRITE_FONT_FEATURE_TAG_SUPERSCRIPT},
+	{"font_feature_swash", DWRITE_FONT_FEATURE_TAG_SWASH},
+	{"font_feature_titling", DWRITE_FONT_FEATURE_TAG_TITLING},
+	{"font_feature_traditional_name_forms", DWRITE_FONT_FEATURE_TAG_TRADITIONAL_NAME_FORMS},
+	{"font_feature_tabular_figures", DWRITE_FONT_FEATURE_TAG_TABULAR_FIGURES},
+	{"font_feature_traditional_forms", DWRITE_FONT_FEATURE_TAG_TRADITIONAL_FORMS},
+	{"font_feature_third_widths", DWRITE_FONT_FEATURE_TAG_THIRD_WIDTHS},
+	{"font_feature_unicase", DWRITE_FONT_FEATURE_TAG_UNICASE},
+	{"font_feature_vertical_writing", DWRITE_FONT_FEATURE_TAG_VERTICAL_WRITING},
+	{"font_feature_vertical_alternates_and_rotation",
+	 DWRITE_FONT_FEATURE_TAG_VERTICAL_ALTERNATES_AND_ROTATION},
+	{"font_feature_slashed_zero", DWRITE_FONT_FEATURE_TAG_SLASHED_ZERO},
+};
+
+bool operator<(const font_feature_tag& a, const font_feature_tag& b)
+{
+	return a.second < b.second;
+}
+
+bool operator<(const font_feature_tag& a, const DWRITE_FONT_FEATURE_TAG& b)
+{
+	return a.second < b;
+}
+
+bool operator<(const DWRITE_FONT_FEATURE_TAG& a, const font_feature_tag& b)
+{
+	return a < b.second;
+}
 
 static void upgrade_properties(void* data, obs_data_t* settings);
 
@@ -776,12 +1048,14 @@ void obs_dwrite_text_source::draw_text()
 	pTextLayout->SetStrikethrough(strikeout, text_range);
 	pTextLayout->SetWordWrapping(wrap);
 
-	if (tabular_figures) {
+	if (!this->font_features.empty()) {
 		winrt::com_ptr<IDWriteTypography> pTypography;
-		pDWriteFactory->CreateTypography(pTypography.put());
-
-		pTypography->AddFontFeature(DWRITE_FONT_FEATURE{ DWRITE_FONT_FEATURE_TAG_TABULAR_FIGURES, 1u });
-		pTextLayout->SetTypography(pTypography.get(), text_range);
+		if (SUCCEEDED(pDWriteFactory->CreateTypography(pTypography.put()))) {
+			for (auto [featureTag, value] : this->font_features) {
+				pTypography->AddFontFeature(DWRITE_FONT_FEATURE{featureTag.second, value});
+			}
+			pTextLayout->SetTypography(pTypography.get(), text_range);
+		}
 	}
 
 	for (auto&& run : runs) {
@@ -1034,8 +1308,6 @@ inline void obs_dwrite_text_source::Update(obs_data_t* s)
 	int32_t new_line_spacing = obs_data_get_int32(s, S_LINE_SPACING);
 	float new_line_spacing_ratio = (float)obs_data_get_double(s, S_LINE_SPACING_RATIO);
 
-	bool new_tabular_figures = obs_data_get_bool(s, S_TABULAR_FIGURES);
-
 	std::vector<DWRITE_FONT_AXIS_VALUE> axis{};
 
 	obs_data_item_t* item = obs_data_first(s);
@@ -1156,7 +1428,14 @@ inline void obs_dwrite_text_source::Update(obs_data_t* s)
 	else if (strcmp(wrap_str, S_WRAP_MODE_NONE) == 0)
 		wrap = DWRITE_WORD_WRAPPING_NO_WRAP;
 
-	tabular_figures = new_tabular_figures;
+	// Build font_features set from settings
+	this->font_features.clear();
+	for (const auto &entry : font_feature_set) {
+		auto value = obs_data_get_bool(s, entry.first);
+		if (value > 0) {
+			this->font_features.insert_or_assign(entry, (UINT32)value);
+		}
+	}
 
 	draw_text();
 	update_time_elapsed = 0.0f;
@@ -1335,6 +1614,55 @@ static bool font_changed(void* priv, obs_properties_t* props, obs_property_t* p,
 	winrt::com_ptr<IDWriteFontFace> fontFace;
 	if (FAILED(font->CreateFontFace(fontFace.put())))
 		return nullptr;
+
+	// Hide all feature properties first, and then update if supported, to avoid showing
+	// unsupported features when switching between fonts with different feature support
+	for (const auto &entry : font_feature_set) {
+		obs_property_t *feat_prop = obs_properties_get(props, entry.first);
+		obs_property_set_visible(feat_prop, false);
+	}
+
+	auto pFactory = src->pDWriteFactory.as<IDWriteFactory>();
+	winrt::com_ptr<IDWriteTextAnalyzer> pTextAnalyzer;
+	winrt::check_hresult(pFactory->CreateTextAnalyzer(pTextAnalyzer.put()));
+	auto pTextAnalyzer2 = pTextAnalyzer.try_as<IDWriteTextAnalyzer2>();
+	if (pTextAnalyzer2) {
+		std::vector<DWRITE_FONT_FEATURE_TAG> featureTags = {};
+		UINT32 featureCount = 0;
+		HRESULT hr = pTextAnalyzer2->GetTypographicFeatures(
+			fontFace.get(), DWRITE_SCRIPT_ANALYSIS{0, DWRITE_SCRIPT_SHAPES_DEFAULT},
+			nullptr, 0, &featureCount, featureTags.data());
+
+		if (featureCount > 0) {
+			featureTags.resize(featureCount);
+			hr = pTextAnalyzer2->GetTypographicFeatures(
+				fontFace.get(), DWRITE_SCRIPT_ANALYSIS{0, DWRITE_SCRIPT_SHAPES_DEFAULT},
+				nullptr, featureCount, &featureCount, featureTags.data());
+			blog(LOG_INFO, "font_changed: Font supports %u typographic features", featureCount);
+
+			// Toggle visibility of each known font-feature property based on support
+			for (const auto featureTag : featureTags) {
+				const auto &key = font_feature_set.find(featureTag);
+				if (key != font_feature_set.end()) {
+					obs_property_t *feat_prop = obs_properties_get(props, key->first);
+					if (feat_prop != nullptr) {
+						obs_property_set_visible(feat_prop, true);
+					} else {
+						blog(LOG_WARNING, "font_changed: Failed to find property for supported font feature with tag '%c%c%c%c'",
+							 (featureTag & 0xFF), ((featureTag >> 8) & 0xFF),
+						     ((featureTag >> 16) & 0xFF), ((featureTag >> 24) & 0xFF));
+					}
+				} else {
+					blog(LOG_WARNING, "font_changed: Font supports unknown typographic feature with tag '%c%c%c%c'",
+					     (featureTag & 0xFF), ((featureTag >> 8) & 0xFF),
+					     ((featureTag >> 16) & 0xFF), ((featureTag >> 24) & 0xFF));
+				}
+			}
+		} else {
+			blog(LOG_INFO, "font_changed: Font does not support any typographic features? %u",
+					featureCount);
+		}
+	}
 
 	obs_property_t* variable_props = obs_properties_get(props, S_VARIABLE);
 	obs_properties_t* variable_group = obs_property_group_content(variable_props);
@@ -1727,7 +2055,6 @@ static obs_properties_t* get_properties(void* data)
 
 	obs_properties_add_bool(font_group, S_FONT_UNDERLINE, T_FONT_UNDERLINE);
 	obs_properties_add_bool(font_group, S_FONT_STRIKETHROUGH, T_FONT_STRIKETHROUGH);
-	obs_properties_add_bool(font_group, S_TABULAR_FIGURES, T_TABULAR_FIGURES);
 
 	obs_properties_t* variable_group = obs_properties_create();
 	p = obs_properties_add_group(props, S_VARIABLE, T_VARIABLE, OBS_GROUP_NORMAL, variable_group);
@@ -1822,6 +2149,137 @@ static obs_properties_t* get_properties(void* data)
 	obs_properties_add_int(outline_group, S_OUTLINE_SIZE, T_OUTLINE_SIZE, 1, 20, 1);
 	obs_properties_add_color(outline_group, S_OUTLINE_COLOR, T_OUTLINE_COLOR);
 	obs_properties_add_int_slider(outline_group, S_OUTLINE_OPACITY, T_OUTLINE_OPACITY, 0, 100, 1);
+
+	// Font features group
+	obs_properties_t *feature_group = obs_properties_create();
+	obs_properties_add_group(props, S_FONT_FEATURES, T_FONT_FEATURES, OBS_GROUP_NORMAL, feature_group);
+
+	// Add a boolean property for every DWRITE_FONT_FEATURE_TAG member
+	obs_properties_add_bool(feature_group, S_FONT_FEATURE_ALTERNATIVE_FRACTIONS,
+				T_FONT_FEATURE_ALTERNATIVE_FRACTIONS);
+	obs_properties_add_bool(feature_group, S_FONT_FEATURE_PETITE_CAPITALS_FROM_CAPITALS,
+				T_FONT_FEATURE_PETITE_CAPITALS_FROM_CAPITALS);
+	obs_properties_add_bool(feature_group, S_FONT_FEATURE_SMALL_CAPITALS_FROM_CAPITALS,
+				T_FONT_FEATURE_SMALL_CAPITALS_FROM_CAPITALS);
+	obs_properties_add_bool(feature_group, S_FONT_FEATURE_CONTEXTUAL_ALTERNATES,
+				T_FONT_FEATURE_CONTEXTUAL_ALTERNATES);
+	obs_properties_add_bool(feature_group, S_FONT_FEATURE_CASE_SENSITIVE_FORMS,
+				T_FONT_FEATURE_CASE_SENSITIVE_FORMS);
+	obs_properties_add_bool(feature_group, S_FONT_FEATURE_GLYPH_COMPOSITION_DECOMPOSITION,
+				T_FONT_FEATURE_GLYPH_COMPOSITION_DECOMPOSITION);
+	obs_properties_add_bool(feature_group, S_FONT_FEATURE_CONTEXTUAL_LIGATURES,
+				T_FONT_FEATURE_CONTEXTUAL_LIGATURES);
+	obs_properties_add_bool(feature_group, S_FONT_FEATURE_CAPITAL_SPACING, T_FONT_FEATURE_CAPITAL_SPACING);
+	obs_properties_add_bool(feature_group, S_FONT_FEATURE_CONTEXTUAL_SWASH,
+				T_FONT_FEATURE_CONTEXTUAL_SWASH);
+	obs_properties_add_bool(feature_group, S_FONT_FEATURE_CURSIVE_POSITIONING,
+				T_FONT_FEATURE_CURSIVE_POSITIONING);
+	obs_properties_add_bool(feature_group, S_FONT_FEATURE_DEFAULT, T_FONT_FEATURE_DEFAULT);
+	obs_properties_add_bool(feature_group, S_FONT_FEATURE_DISCRETIONARY_LIGATURES,
+				T_FONT_FEATURE_DISCRETIONARY_LIGATURES);
+	obs_properties_add_bool(feature_group, S_FONT_FEATURE_EXPERT_FORMS, T_FONT_FEATURE_EXPERT_FORMS);
+	obs_properties_add_bool(feature_group, S_FONT_FEATURE_FRACTIONS, T_FONT_FEATURE_FRACTIONS);
+	obs_properties_add_bool(feature_group, S_FONT_FEATURE_FULL_WIDTH, T_FONT_FEATURE_FULL_WIDTH);
+	obs_properties_add_bool(feature_group, S_FONT_FEATURE_HALF_FORMS, T_FONT_FEATURE_HALF_FORMS);
+	obs_properties_add_bool(feature_group, S_FONT_FEATURE_HALANT_FORMS, T_FONT_FEATURE_HALANT_FORMS);
+	obs_properties_add_bool(feature_group, S_FONT_FEATURE_ALTERNATE_HALF_WIDTH,
+				T_FONT_FEATURE_ALTERNATE_HALF_WIDTH);
+	obs_properties_add_bool(feature_group, S_FONT_FEATURE_HISTORICAL_FORMS,
+				T_FONT_FEATURE_HISTORICAL_FORMS);
+	obs_properties_add_bool(feature_group, S_FONT_FEATURE_HORIZONTAL_KANA_ALTERNATES,
+				T_FONT_FEATURE_HORIZONTAL_KANA_ALTERNATES);
+	obs_properties_add_bool(feature_group, S_FONT_FEATURE_HISTORICAL_LIGATURES,
+				T_FONT_FEATURE_HISTORICAL_LIGATURES);
+	obs_properties_add_bool(feature_group, S_FONT_FEATURE_HALF_WIDTH, T_FONT_FEATURE_HALF_WIDTH);
+	obs_properties_add_bool(feature_group, S_FONT_FEATURE_HOJO_KANJI_FORMS,
+				T_FONT_FEATURE_HOJO_KANJI_FORMS);
+	obs_properties_add_bool(feature_group, S_FONT_FEATURE_JIS04_FORMS, T_FONT_FEATURE_JIS04_FORMS);
+	obs_properties_add_bool(feature_group, S_FONT_FEATURE_JIS78_FORMS, T_FONT_FEATURE_JIS78_FORMS);
+	obs_properties_add_bool(feature_group, S_FONT_FEATURE_JIS83_FORMS, T_FONT_FEATURE_JIS83_FORMS);
+	obs_properties_add_bool(feature_group, S_FONT_FEATURE_JIS90_FORMS, T_FONT_FEATURE_JIS90_FORMS);
+	obs_properties_add_bool(feature_group, S_FONT_FEATURE_KERNING, T_FONT_FEATURE_KERNING);
+	obs_properties_add_bool(feature_group, S_FONT_FEATURE_STANDARD_LIGATURES,
+				T_FONT_FEATURE_STANDARD_LIGATURES);
+	obs_properties_add_bool(feature_group, S_FONT_FEATURE_LINING_FIGURES, T_FONT_FEATURE_LINING_FIGURES);
+	obs_properties_add_bool(feature_group, S_FONT_FEATURE_LOCALIZED_FORMS, T_FONT_FEATURE_LOCALIZED_FORMS);
+	obs_properties_add_bool(feature_group, S_FONT_FEATURE_MARK_POSITIONING,
+				T_FONT_FEATURE_MARK_POSITIONING);
+	obs_properties_add_bool(feature_group, S_FONT_FEATURE_MATHEMATICAL_GREEK,
+				T_FONT_FEATURE_MATHEMATICAL_GREEK);
+	obs_properties_add_bool(feature_group, S_FONT_FEATURE_MARK_TO_MARK_POSITIONING,
+				T_FONT_FEATURE_MARK_TO_MARK_POSITIONING);
+	obs_properties_add_bool(feature_group, S_FONT_FEATURE_ALTERNATE_ANNOTATION_FORMS,
+				T_FONT_FEATURE_ALTERNATE_ANNOTATION_FORMS);
+	obs_properties_add_bool(feature_group, S_FONT_FEATURE_NLC_KANJI_FORMS, T_FONT_FEATURE_NLC_KANJI_FORMS);
+	obs_properties_add_bool(feature_group, S_FONT_FEATURE_OLD_STYLE_FIGURES,
+				T_FONT_FEATURE_OLD_STYLE_FIGURES);
+	obs_properties_add_bool(feature_group, S_FONT_FEATURE_ORDINALS, T_FONT_FEATURE_ORDINALS);
+	obs_properties_add_bool(feature_group, S_FONT_FEATURE_PROPORTIONAL_ALTERNATE_WIDTH,
+				T_FONT_FEATURE_PROPORTIONAL_ALTERNATE_WIDTH);
+	obs_properties_add_bool(feature_group, S_FONT_FEATURE_PETITE_CAPITALS, T_FONT_FEATURE_PETITE_CAPITALS);
+	obs_properties_add_bool(feature_group, S_FONT_FEATURE_PROPORTIONAL_FIGURES,
+				T_FONT_FEATURE_PROPORTIONAL_FIGURES);
+	obs_properties_add_bool(feature_group, S_FONT_FEATURE_PROPORTIONAL_WIDTHS,
+				T_FONT_FEATURE_PROPORTIONAL_WIDTHS);
+	obs_properties_add_bool(feature_group, S_FONT_FEATURE_QUARTER_WIDTHS, T_FONT_FEATURE_QUARTER_WIDTHS);
+	obs_properties_add_bool(feature_group, S_FONT_FEATURE_REQUIRED_LIGATURES,
+				T_FONT_FEATURE_REQUIRED_LIGATURES);
+	obs_properties_add_bool(feature_group, S_FONT_FEATURE_RUBY_NOTATION_FORMS,
+				T_FONT_FEATURE_RUBY_NOTATION_FORMS);
+	obs_properties_add_bool(feature_group, S_FONT_FEATURE_STYLISTIC_ALTERNATES,
+				T_FONT_FEATURE_STYLISTIC_ALTERNATES);
+	obs_properties_add_bool(feature_group, S_FONT_FEATURE_SCIENTIFIC_INFERIORS,
+				T_FONT_FEATURE_SCIENTIFIC_INFERIORS);
+	obs_properties_add_bool(feature_group, S_FONT_FEATURE_SMALL_CAPITALS, T_FONT_FEATURE_SMALL_CAPITALS);
+	obs_properties_add_bool(feature_group, S_FONT_FEATURE_SIMPLIFIED_FORMS,
+				T_FONT_FEATURE_SIMPLIFIED_FORMS);
+	obs_properties_add_bool(feature_group, S_FONT_FEATURE_STYLISTIC_SET_1, T_FONT_FEATURE_STYLISTIC_SET_1);
+	obs_properties_add_bool(feature_group, S_FONT_FEATURE_STYLISTIC_SET_2, T_FONT_FEATURE_STYLISTIC_SET_2);
+	obs_properties_add_bool(feature_group, S_FONT_FEATURE_STYLISTIC_SET_3, T_FONT_FEATURE_STYLISTIC_SET_3);
+	obs_properties_add_bool(feature_group, S_FONT_FEATURE_STYLISTIC_SET_4, T_FONT_FEATURE_STYLISTIC_SET_4);
+	obs_properties_add_bool(feature_group, S_FONT_FEATURE_STYLISTIC_SET_5, T_FONT_FEATURE_STYLISTIC_SET_5);
+	obs_properties_add_bool(feature_group, S_FONT_FEATURE_STYLISTIC_SET_6, T_FONT_FEATURE_STYLISTIC_SET_6);
+	obs_properties_add_bool(feature_group, S_FONT_FEATURE_STYLISTIC_SET_7, T_FONT_FEATURE_STYLISTIC_SET_7);
+	obs_properties_add_bool(feature_group, S_FONT_FEATURE_STYLISTIC_SET_8, T_FONT_FEATURE_STYLISTIC_SET_8);
+	obs_properties_add_bool(feature_group, S_FONT_FEATURE_STYLISTIC_SET_9, T_FONT_FEATURE_STYLISTIC_SET_9);
+	obs_properties_add_bool(feature_group, S_FONT_FEATURE_STYLISTIC_SET_10,
+				T_FONT_FEATURE_STYLISTIC_SET_10);
+	obs_properties_add_bool(feature_group, S_FONT_FEATURE_STYLISTIC_SET_11,
+				T_FONT_FEATURE_STYLISTIC_SET_11);
+	obs_properties_add_bool(feature_group, S_FONT_FEATURE_STYLISTIC_SET_12,
+				T_FONT_FEATURE_STYLISTIC_SET_12);
+	obs_properties_add_bool(feature_group, S_FONT_FEATURE_STYLISTIC_SET_13,
+				T_FONT_FEATURE_STYLISTIC_SET_13);
+	obs_properties_add_bool(feature_group, S_FONT_FEATURE_STYLISTIC_SET_14,
+				T_FONT_FEATURE_STYLISTIC_SET_14);
+	obs_properties_add_bool(feature_group, S_FONT_FEATURE_STYLISTIC_SET_15,
+				T_FONT_FEATURE_STYLISTIC_SET_15);
+	obs_properties_add_bool(feature_group, S_FONT_FEATURE_STYLISTIC_SET_16,
+				T_FONT_FEATURE_STYLISTIC_SET_16);
+	obs_properties_add_bool(feature_group, S_FONT_FEATURE_STYLISTIC_SET_17,
+				T_FONT_FEATURE_STYLISTIC_SET_17);
+	obs_properties_add_bool(feature_group, S_FONT_FEATURE_STYLISTIC_SET_18,
+				T_FONT_FEATURE_STYLISTIC_SET_18);
+	obs_properties_add_bool(feature_group, S_FONT_FEATURE_STYLISTIC_SET_19,
+				T_FONT_FEATURE_STYLISTIC_SET_19);
+	obs_properties_add_bool(feature_group, S_FONT_FEATURE_STYLISTIC_SET_20,
+				T_FONT_FEATURE_STYLISTIC_SET_20);
+	obs_properties_add_bool(feature_group, S_FONT_FEATURE_SUBSCRIPT, T_FONT_FEATURE_SUBSCRIPT);
+	obs_properties_add_bool(feature_group, S_FONT_FEATURE_SUPERSCRIPT, T_FONT_FEATURE_SUPERSCRIPT);
+	obs_properties_add_bool(feature_group, S_FONT_FEATURE_SWASH, T_FONT_FEATURE_SWASH);
+	obs_properties_add_bool(feature_group, S_FONT_FEATURE_TITLING, T_FONT_FEATURE_TITLING);
+	obs_properties_add_bool(feature_group, S_FONT_FEATURE_TRADITIONAL_NAME_FORMS,
+				T_FONT_FEATURE_TRADITIONAL_NAME_FORMS);
+	obs_properties_add_bool(feature_group, S_FONT_FEATURE_TABULAR_FIGURES, T_FONT_FEATURE_TABULAR_FIGURES);
+	obs_properties_add_bool(feature_group, S_FONT_FEATURE_TRADITIONAL_FORMS,
+				T_FONT_FEATURE_TRADITIONAL_FORMS);
+	obs_properties_add_bool(feature_group, S_FONT_FEATURE_THIRD_WIDTHS, T_FONT_FEATURE_THIRD_WIDTHS);
+	obs_properties_add_bool(feature_group, S_FONT_FEATURE_UNICASE, T_FONT_FEATURE_UNICASE);
+	obs_properties_add_bool(feature_group, S_FONT_FEATURE_VERTICAL_WRITING,
+				T_FONT_FEATURE_VERTICAL_WRITING);
+	obs_properties_add_bool(feature_group, S_FONT_FEATURE_VERTICAL_ALTERNATES_AND_ROTATION,
+				T_FONT_FEATURE_VERTICAL_ALTERNATES_AND_ROTATION);
+	obs_properties_add_bool(feature_group, S_FONT_FEATURE_SLASHED_ZERO, T_FONT_FEATURE_SLASHED_ZERO);
 
 	// advanced group
 	obs_properties_t* advanced_group = obs_properties_create();
